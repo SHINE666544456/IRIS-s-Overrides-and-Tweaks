@@ -5,7 +5,13 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "AbstractClientPlayerEntityMixin",
-    "PlayerListEntryMixin"
+    "PlayerListEntryMixin",
+    "LivingEntityRendererMixin",
+    "CameraAccessor",
+    "SimpleOptionAccessor",
+    "ChatHudMixin",
+    "GameRendererMixin",
+    "MouseMixin"
   ],
   "injectors": {
     "defaultRequire": 1

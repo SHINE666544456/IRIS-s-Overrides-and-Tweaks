@@ -2,6 +2,7 @@ package dev.skinoverride;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import dev.skinoverride.chat.ChatColors;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -26,6 +27,8 @@ public final class ModConfig {
     /** 0 = off, 1 = remaining durability, 2 = percent */
     public int armorDurability = 1;
     public boolean armorLowWarning = true;
+    /** 0 = horizontal row, 1 = vertical column */
+    public int armorLayout = 0;
     public int armorLowPercent = 15;
 
     // effect timers
@@ -42,7 +45,45 @@ public final class ModConfig {
     // AFK detection
     public boolean afkTracking = true;
     public boolean afkHudList = false;
+    public boolean afkTags = true;
     public int afkSeconds = 60;
+
+    // info panel
+    public boolean infoHud = true;
+    public boolean infoCoords = true;
+    public boolean infoDirection = true;
+    public boolean infoFps = true;
+    public boolean infoPing = false;
+
+    // visuals
+    public boolean revealInvisible = true;
+    public boolean fullbright = false;
+    public int zoomDefault = 4;
+    public boolean zoomSmoothCamera = true;
+
+    // chat
+    public boolean chatCustom = true;
+    public int chatDefaultNameColor = ChatColors.DEFAULT;
+    public int chatDefaultMsgColor = ChatColors.DEFAULT;
+    public int chatJoinColor = ChatColors.DEFAULT;
+    public int chatLeaveColor = ChatColors.DEFAULT;
+    public int chatAdvancementColor = ChatColors.DEFAULT;
+    public int chatDeathColor = ChatColors.DEFAULT;
+    public boolean chatEmotes = true;
+    public boolean chatEmoteFaces = false;
+    public boolean chatBubbles = false;
+    public int chatBubbleSeconds = 6;
+    public int chatBubbleRange = 24;
+    public boolean chatTts = false;
+    public String ttsPrevMode = "OFF";
+    /** lower-case player name -> colors */
+    public Map<String, PlayerChat> chatPlayers = new HashMap<>();
+
+    public static class PlayerChat {
+        public String name = "";
+        public int nameColor = ChatColors.DEFAULT;
+        public int msgColor = ChatColors.DEFAULT;
+    }
 
     /** HUD element id -> {x, y} as 0..1 fractions of the free screen space. */
     public Map<String, float[]> positions = new HashMap<>();
@@ -66,6 +107,9 @@ public final class ModConfig {
                 if (read != null) {
                     if (read.positions == null) {
                         read.positions = new HashMap<>();
+                    }
+                    if (read.chatPlayers == null) {
+                        read.chatPlayers = new HashMap<>();
                     }
                     return read;
                 }

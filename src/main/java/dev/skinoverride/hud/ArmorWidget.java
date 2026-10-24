@@ -12,7 +12,10 @@ import net.minecraft.item.Items;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Your worn armor plus held items, with durability numbers and a flashing low-durability warning. */
+/**
+ * Your worn armor plus held items with durability numbers and a flashing low-durability warning.
+ * Can be a horizontal row or a vertical column, and be dragged anywhere (e.g. beside the hotbar).
+ */
 public class ArmorWidget implements HudWidget {
 
     private static final int SLOT = 22;
@@ -22,8 +25,10 @@ public class ArmorWidget implements HudWidget {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
     };
 
-    private final List<ItemStack> armorStacks = new ArrayList<>();
-    private final List<ItemStack> heldStacks = new ArrayList<>();
+    private final List<ItemStack> stacks = new ArrayList<>();
+    private int armorCount;
+    private boolean vertical;
+    private int labelW;
     private List<ItemStack> demo;
     private int w;
     private int h;
@@ -59,11 +64,21 @@ public class ArmorWidget implements HudWidget {
         return !(mc.currentScreen instanceof HandledScreen<?>);
     }
 
+    private static String durabilityText(ItemStack stack, ModConfig cfg) {
+        if (cfg.armorDurability == 0 || stack.getMaxDamage() <= 0) {
+            return "";
+        }
+        int left = stack.getMaxDamage() - stack.getDamage();
+        return cfg.armorDurability == 2 ? (left * 100 / stack.getMaxDamage()) + "%" : String.valueOf(left);
+    }
+
     @Override
     public void prepare(MinecraftClient mc, boolean preview) {
         ModConfig cfg = ModConfig.get();
-        armorStacks.clear();
-        heldStacks.clear();
+        stacks.clear();
+        armorCount = 0;
+        vertical = cfg.armorLayout == 1;
+
         if (preview || mc.player == null) {
             if (demo == null) {
                 ItemStack helmet = new ItemStack(Items.DIAMOND_HELMET);
@@ -72,38 +87,52 @@ public class ArmorWidget implements HudWidget {
                         new ItemStack(Items.DIAMOND_LEGGINGS), new ItemStack(Items.DIAMOND_BOOTS),
                         new ItemStack(Items.DIAMOND_SWORD));
             }
-            armorStacks.addAll(demo.subList(0, 4));
+            stacks.addAll(demo.subList(0, 4));
+            armorCount = 4;
             if (cfg.armorHeld) {
-                heldStacks.add(demo.get(4));
+                stacks.add(demo.get(4));
             }
         } else {
             for (EquipmentSlot slot : ARMOR) {
                 ItemStack s = mc.player.getEquippedStack(slot);
                 if (!s.isEmpty()) {
-                    armorStacks.add(s);
+                    stacks.add(s);
+                    armorCount++;
                 }
             }
             if (cfg.armorHeld) {
                 ItemStack s = mc.player.getEquippedStack(EquipmentSlot.MAINHAND);
                 if (!s.isEmpty()) {
-                    heldStacks.add(s);
+                    stacks.add(s);
                 }
             }
             if (cfg.armorOffhand) {
                 ItemStack s = mc.player.getEquippedStack(EquipmentSlot.OFFHAND);
                 if (!s.isEmpty()) {
-                    heldStacks.add(s);
+                    stacks.add(s);
                 }
             }
         }
-        int count = armorStacks.size() + heldStacks.size();
+
+        int count = stacks.size();
         if (count == 0) {
             w = 0;
             h = 0;
             return;
         }
-        w = count * SLOT + (count - 1) * GAP + (!armorStacks.isEmpty() && !heldStacks.isEmpty() ? GROUP_GAP - GAP : 0);
-        h = SLOT + (cfg.armorDurability != 0 ? 11 : 0);
+        boolean twoGroups = armorCount > 0 && armorCount < count;
+        int extra = twoGroups ? GROUP_GAP - GAP : 0;
+        if (vertical) {
+            labelW = 0;
+            for (ItemStack s : stacks) {
+                labelW = Math.max(labelW, mc.textRenderer.getWidth(durabilityText(s, cfg)));
+            }
+            w = SLOT + (labelW > 0 ? 4 + labelW : 0);
+            h = count * SLOT + (count - 1) * GAP + extra;
+        } else {
+            w = count * SLOT + (count - 1) * GAP + extra;
+            h = SLOT + (cfg.armorDurability != 0 ? 11 : 0);
+        }
     }
 
     @Override
@@ -119,16 +148,21 @@ public class ArmorWidget implements HudWidget {
     @Override
     public void render(DrawContext c, MinecraftClient mc, int x, int y, boolean preview) {
         int cx = x;
-        for (ItemStack s : armorStacks) {
-            drawSlot(c, mc, s, cx, y);
-            cx += SLOT + GAP;
-        }
-        if (!armorStacks.isEmpty() && !heldStacks.isEmpty()) {
-            cx += GROUP_GAP - GAP;
-        }
-        for (ItemStack s : heldStacks) {
-            drawSlot(c, mc, s, cx, y);
-            cx += SLOT + GAP;
+        int cy = y;
+        for (int i = 0; i < stacks.size(); i++) {
+            if (i == armorCount && armorCount > 0) {
+                if (vertical) {
+                    cy += GROUP_GAP - GAP;
+                } else {
+                    cx += GROUP_GAP - GAP;
+                }
+            }
+            drawSlot(c, mc, stacks.get(i), cx, cy);
+            if (vertical) {
+                cy += SLOT + GAP;
+            } else {
+                cx += SLOT + GAP;
+            }
         }
     }
 
@@ -148,13 +182,15 @@ public class ArmorWidget implements HudWidget {
         c.drawItem(stack, x + 3, y + 3);
         c.drawStackOverlay(mc.textRenderer, stack, x + 3, y + 3);
 
-        if (cfg.armorDurability != 0 && damageable) {
-            String text = cfg.armorDurability == 2
-                    ? percent + "%"
-                    : String.valueOf(stack.getMaxDamage() - stack.getDamage());
+        String text = durabilityText(stack, cfg);
+        if (!text.isEmpty()) {
             int color = low ? (Ui.blink() ? Ui.BAD : 0xFFB04040) : percent <= 50 ? Ui.WARN : Ui.MUTED;
-            int tw = mc.textRenderer.getWidth(text);
-            c.drawTextWithShadow(mc.textRenderer, text, x + (SLOT - tw) / 2, y + SLOT + 2, color);
+            if (vertical) {
+                c.drawTextWithShadow(mc.textRenderer, text, x + SLOT + 4, y + (SLOT - 8) / 2, color);
+            } else {
+                int tw = mc.textRenderer.getWidth(text);
+                c.drawTextWithShadow(mc.textRenderer, text, x + (SLOT - tw) / 2, y + SLOT + 2, color);
+            }
         }
     }
 }

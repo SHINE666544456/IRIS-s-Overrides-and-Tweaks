@@ -2,6 +2,7 @@ package dev.skinoverride.hud;
 
 import dev.skinoverride.ModConfig;
 import dev.skinoverride.SkinOverrideClient;
+import dev.skinoverride.WorldLabels;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
@@ -16,6 +17,7 @@ public final class HudManager {
     public static final int PAD = 2;
 
     public static final List<HudWidget> WIDGETS = List.of(
+            new InfoWidget(),
             new ArmorWidget(),
             new EffectsWidget(),
             new InspectWidget(),
@@ -58,6 +60,7 @@ public final class HudManager {
             int[] p = position(w, sw, sh, w.width(), w.height());
             w.render(context, mc, p[0], p[1], false);
         }
+        WorldLabels.render(context, mc);
     }
 
     /** Top-left pixel position of a widget of the given size. */

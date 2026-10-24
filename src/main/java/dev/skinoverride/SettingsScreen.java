@@ -1,5 +1,7 @@
 package dev.skinoverride;
 
+import dev.skinoverride.chat.ChatColors;
+import dev.skinoverride.chat.Emotes;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -14,10 +16,10 @@ import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.IntSupplier;
 
-/** Tabbed settings screen: toggles, sliders and option cyclers for every feature. */
+/** Tabbed settings screen: toggles, sliders, color pickers and option cyclers for every feature. */
 public class SettingsScreen extends ThemedScreen {
 
-    private sealed interface Row permits Header, Note, Toggle, Slider, Cycle {
+    private sealed interface Row permits Header, Note, Toggle, Slider, Cycle, ColorRow, Action, EmoteGrid {
     }
 
     private record Header(String text) implements Row {
@@ -36,7 +38,16 @@ public class SettingsScreen extends ThemedScreen {
     private record Cycle(String label, String desc, String[] options, IntSupplier get, IntConsumer set) implements Row {
     }
 
-    private static final String[] TABS = {"HUD", "Inspect", "AFK"};
+    private record ColorRow(String label, String desc, IntSupplier get, IntConsumer set) implements Row {
+    }
+
+    private record Action(String label, String desc, String button, Runnable run) implements Row {
+    }
+
+    private record EmoteGrid() implements Row {
+    }
+
+    private static final String[] TABS = {"HUD", "Inspect", "AFK", "Chat", "Visuals"};
     private static final int TAB_W = 78;
     private static final int SLIDER_W = 100;
 
@@ -47,6 +58,9 @@ public class SettingsScreen extends ThemedScreen {
     private double scroll;
     private Slider dragging;
     private int dragX;
+    private ColorRow picker;
+    private int pickerX;
+    private int pickerY;
 
     // panel geometry
     private int px, py, pw, ph, contentX, contentW, contentTop, contentBottom;
@@ -63,13 +77,15 @@ public class SettingsScreen extends ThemedScreen {
         switch (tab) {
             case 0 -> {
                 r.add(new Header("Armor & held items"));
-                r.add(new Toggle("Show armor HUD", "Your armor, bottom-left by default.",
+                r.add(new Toggle("Show armor HUD", "Your armor and held items. Drag it anywhere.",
                         () -> cfg.armorHud, v -> cfg.armorHud = v));
                 r.add(new Toggle("Show held item", "Main-hand item next to your armor.",
                         () -> cfg.armorHeld, v -> cfg.armorHeld = v));
                 r.add(new Toggle("Show off-hand", "Off-hand item too.",
                         () -> cfg.armorOffhand, v -> cfg.armorOffhand = v));
-                r.add(new Cycle("Durability text", "Number under each damageable item.",
+                r.add(new Cycle("Direction", "Row or column (for next to the hotbar).",
+                        new String[]{"Horizontal", "Vertical"}, () -> cfg.armorLayout, v -> cfg.armorLayout = v));
+                r.add(new Cycle("Durability text", "Number next to each damageable item.",
                         new String[]{"Off", "Remaining", "Percent"},
                         () -> cfg.armorDurability, v -> cfg.armorDurability = v));
                 r.add(new Toggle("Low durability warning", "The slot flashes red when low.",
@@ -83,6 +99,18 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.effectsFlash, v -> cfg.effectsFlash = v));
                 r.add(new Slider("Low at", "Seconds left before it counts as low.", 3, 30, 1,
                         v -> v + "s", () -> cfg.effectsLowSeconds, v -> cfg.effectsLowSeconds = v));
+                r.add(new Header("Coordinates & FPS"));
+                r.add(new Toggle("Show info panel", "A small movable panel.",
+                        () -> cfg.infoHud, v -> cfg.infoHud = v));
+                r.add(new Toggle("Coordinates", "Your X / Y / Z.",
+                        () -> cfg.infoCoords, v -> cfg.infoCoords = v));
+                r.add(new Toggle("Facing direction", "Compass direction you look.",
+                        () -> cfg.infoDirection, v -> cfg.infoDirection = v));
+                r.add(new Toggle("FPS", "Frames per second.",
+                        () -> cfg.infoFps, v -> cfg.infoFps = v));
+                r.add(new Toggle("Ping", "Latency to the server.",
+                        () -> cfg.infoPing, v -> cfg.infoPing = v));
+                r.add(new Note("Move or resize nothing by hand: use Edit HUD layout below."));
             }
             case 1 -> {
                 r.add(new Header("Crosshair inspect"));
@@ -97,36 +125,102 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Note("Only players you can see are shown, and only held/worn items:"));
                 r.add(new Note("servers never send other players' inventories to your client."));
             }
-            default -> {
+            case 2 -> {
                 r.add(new Header("AFK detection"));
                 r.add(new Toggle("Enable AFK detection", "Watches nearby players for movement.",
                         () -> cfg.afkTracking, v -> cfg.afkTracking = v));
                 r.add(new Slider("Mark AFK after", "Time without moving or turning.", 15, 600, 15,
                         Ui::formatShort, () -> cfg.afkSeconds, v -> cfg.afkSeconds = v));
+                r.add(new Toggle("AFK tag over heads", "A small AFK label above their head.",
+                        () -> cfg.afkTags, v -> cfg.afkTags = v));
                 r.add(new Toggle("Show AFK list on HUD", "Small movable list of AFK players.",
                         () -> cfg.afkHudList, v -> cfg.afkHudList = v));
-                r.add(new Note("AFK tags also show in the skin screen and inspect overlay."));
+                r.add(new Note("AFK also shows in the skin screen and the inspect overlay."));
                 r.add(new Note("Only players loaded near you can be watched. Being pushed"));
                 r.add(new Note("by water or pistons counts as moving."));
+            }
+            case 3 -> {
+                r.add(new Header("Chat colors"));
+                r.add(new Toggle("Custom chat colors", "Master switch for the colors below.",
+                        () -> cfg.chatCustom, v -> cfg.chatCustom = v));
+                r.add(new ColorRow("Everyone's name color", "Used unless a player has their own.",
+                        () -> cfg.chatDefaultNameColor, v -> cfg.chatDefaultNameColor = v));
+                r.add(new ColorRow("Everyone's message color", "Used unless a player has their own.",
+                        () -> cfg.chatDefaultMsgColor, v -> cfg.chatDefaultMsgColor = v));
+                r.add(new Action("Per-player colors", "Pick name and message colors per player.", "Open",
+                        () -> this.client.setScreen(new ChatPlayersScreen(this))));
+                r.add(new ColorRow("Join messages", "\"X joined the game\".",
+                        () -> cfg.chatJoinColor, v -> cfg.chatJoinColor = v));
+                r.add(new ColorRow("Leave messages", "\"X left the game\".",
+                        () -> cfg.chatLeaveColor, v -> cfg.chatLeaveColor = v));
+                r.add(new ColorRow("Advancements", "Advancement and challenge messages.",
+                        () -> cfg.chatAdvancementColor, v -> cfg.chatAdvancementColor = v));
+                r.add(new ColorRow("Death messages", "How players died.",
+                        () -> cfg.chatDeathColor, v -> cfg.chatDeathColor = v));
+                r.add(new Note("Rainbow colors every letter. Color cycle gives each new message"));
+                r.add(new Note("a different color. Colors are fixed once a message arrives."));
+                r.add(new Header("Emotes"));
+                r.add(new Toggle("Emotes", "Show :smile: :heart: ... as pixel emotes.",
+                        () -> cfg.chatEmotes, v -> cfg.chatEmotes = v));
+                r.add(new Toggle("Text faces", "Also turn :) :D <3 into emotes.",
+                        () -> cfg.chatEmoteFaces, v -> cfg.chatEmoteFaces = v));
+                r.add(new EmoteGrid());
+                r.add(new Note("Only you see emotes. Animated GIFs can't be shown in chat text."));
+                r.add(new Header("Speech bubbles"));
+                r.add(new Toggle("Bubbles above heads", "Chat messages float above nearby players.",
+                        () -> cfg.chatBubbles, v -> cfg.chatBubbles = v));
+                r.add(new Slider("Bubble time", "How long a bubble stays.", 3, 15, 1,
+                        v -> v + "s", () -> cfg.chatBubbleSeconds, v -> cfg.chatBubbleSeconds = v));
+                r.add(new Slider("Bubble range", "How close the player must be.", 8, 64, 4,
+                        v -> v + " blocks", () -> cfg.chatBubbleRange, v -> cfg.chatBubbleRange = v));
+                r.add(new Header("Text to speech"));
+                r.add(new Toggle("Read chat aloud", "Uses Minecraft's built-in narrator.",
+                        () -> cfg.chatTts, Tts::set));
+                r.add(new Note("The voice and speed come from your operating system."));
+            }
+            default -> {
+                r.add(new Header("World"));
+                r.add(new Toggle("Reveal invisible players", "Shows invisible players and mobs normally.",
+                        () -> cfg.revealInvisible, v -> cfg.revealInvisible = v));
+                r.add(new Note("Only changes what YOU see. Invisibility still works for everyone else."));
+                r.add(new Toggle("Fullbright", "See clearly in the dark. Key: G.",
+                        () -> cfg.fullbright, v -> cfg.fullbright = v));
+                r.add(new Header("Zoom"));
+                r.add(new Slider("Default zoom", "Hold C to zoom; scroll to change it.", 2, 10, 1,
+                        v -> v + "x", () -> cfg.zoomDefault, v -> cfg.zoomDefault = v));
+                r.add(new Toggle("Smooth camera while zooming", "Steadier aiming when zoomed in.",
+                        () -> cfg.zoomSmoothCamera, v -> cfg.zoomSmoothCamera = v));
+                r.add(new Header("Screenshots"));
+                r.add(new Action("Clean screenshot", "Hides the HUD; player name tags stay. Key: F9.", "Take now",
+                        () -> {
+                            this.client.setScreen(null);
+                            CleanScreenshot.request(this.client);
+                        }));
+                r.add(new Note("Keys can be changed under Options > Controls (search \"IRIS\")."));
             }
         }
         return r;
     }
 
     private static int rowHeight(Row row) {
-        return row instanceof Header ? 18 : row instanceof Note ? 11 : 28;
-    }
-
-    private int totalHeight(List<Row> rows) {
-        int h = 4;
-        for (Row r : rows) {
-            h += rowHeight(r);
+        if (row instanceof Header) {
+            return 18;
         }
-        return h;
+        if (row instanceof Note) {
+            return 11;
+        }
+        if (row instanceof EmoteGrid) {
+            return 4 * 13 + 6;
+        }
+        return 28;
     }
 
     private double maxScroll() {
-        return Math.max(0, totalHeight(rows()) - (contentBottom - contentTop));
+        int total = 4;
+        for (Row r : rows()) {
+            total += rowHeight(r);
+        }
+        return Math.max(0, total - (contentBottom - contentTop));
     }
 
     // ---------- setup ----------
@@ -159,7 +253,6 @@ public class SettingsScreen extends ThemedScreen {
         Ui.panel(c, px, py, pw, ph);
         Ui.header(c, this.textRenderer, "IRIS'S Overrides and Tweaks  /  Settings", px + 1, py + 1, pw - 2);
 
-        // tabs
         for (int i = 0; i < TABS.length; i++) {
             int ty = py + 22 + i * 24;
             boolean sel = i == tab;
@@ -171,19 +264,24 @@ public class SettingsScreen extends ThemedScreen {
 
         List<Row> rows = rows();
         scroll = MathHelper.clamp(scroll, 0.0, maxScroll());
+        boolean pickerOpen = picker != null;
 
         c.enableScissor(contentX, contentTop, contentX + contentW, contentBottom);
         int y = contentTop + 2 - (int) scroll;
         for (Row row : rows) {
             int h = rowHeight(row);
             if (y + h >= contentTop && y <= contentBottom) {
-                drawRow(c, row, y, mouseX, mouseY);
+                drawRow(c, row, y, pickerOpen ? -1 : mouseX, pickerOpen ? -1 : mouseY);
             }
             y += h;
         }
         c.disableScissor();
 
         drawButtons(c, mouseX, mouseY);
+
+        if (picker != null) {
+            ColorPicker.draw(c, this.textRenderer, pickerX, pickerY, mouseX, mouseY, picker.get().getAsInt());
+        }
     }
 
     private void drawRow(DrawContext c, Row row, int y, int mouseX, int mouseY) {
@@ -224,6 +322,31 @@ public class SettingsScreen extends ThemedScreen {
                 Ui.text(c, tr, cy.desc(), contentX + 6, y + 15, Ui.MUTED);
                 Ui.button(c, tr, right - 74, y + 4, 74, 18, cy.options()[cy.get().getAsInt()], hov, true, false);
             }
+            case ColorRow cr -> {
+                boolean hov = Ui.inside(mouseX, mouseY, contentX, y, contentW, 28);
+                if (hov) {
+                    Ui.roundRect(c, contentX, y, contentW - 2, 26, 0x30FFFFFF);
+                }
+                Ui.text(c, tr, cr.label(), contentX + 6, y + 4, Ui.TEXT);
+                Ui.text(c, tr, cr.desc(), contentX + 6, y + 15, Ui.MUTED);
+                Ui.roundBorder(c, right - 42, y + 5, 42, 16, hov ? Ui.ACCENT : Ui.BORDER);
+                ColorPicker.swatch(c, tr, right - 41, y + 6, 40, 14, cr.get().getAsInt());
+            }
+            case Action a -> {
+                Ui.text(c, tr, a.label(), contentX + 6, y + 4, Ui.TEXT);
+                Ui.text(c, tr, a.desc(), contentX + 6, y + 15, Ui.MUTED);
+                boolean hov = Ui.inside(mouseX, mouseY, right - 70, y + 4, 70, 18);
+                Ui.button(c, tr, right - 70, y + 4, 70, 18, a.button(), hov, true, true);
+            }
+            case EmoteGrid g -> {
+                int cell = (contentW - 12) / 4;
+                for (int i = 0; i < Emotes.NAMES.length; i++) {
+                    int ex = contentX + 6 + (i % 4) * cell;
+                    int ey = y + 3 + (i / 4) * 13;
+                    c.drawTextWithShadow(tr, Text.literal(String.valueOf(Emotes.glyph(i))), ex, ey, 0xFFFFFFFF);
+                    Ui.text(c, tr, ":" + Emotes.NAMES[i] + ":", ex + 14, ey, Ui.MUTED);
+                }
+            }
         }
     }
 
@@ -239,6 +362,17 @@ public class SettingsScreen extends ThemedScreen {
         }
         double mx = click.x();
         double my = click.y();
+
+        if (picker != null) {
+            Integer chosen = ColorPicker.hit(mx, my, pickerX, pickerY);
+            if (chosen != null) {
+                picker.set().accept(chosen);
+                cfg.save();
+                clickSound();
+            }
+            picker = null;
+            return true;
+        }
 
         for (int i = 0; i < TABS.length; i++) {
             if (Ui.inside(mx, my, px + 4, py + 22 + i * 24, TAB_W, 20)) {
@@ -280,6 +414,23 @@ public class SettingsScreen extends ThemedScreen {
                             return true;
                         }
                     }
+                    case ColorRow cr -> {
+                        picker = cr;
+                        pickerX = Math.max(px + 4, right - ColorPicker.width());
+                        pickerY = y + 26;
+                        if (pickerY + ColorPicker.height() > py + ph - 2) {
+                            pickerY = Math.max(py + 20, y - ColorPicker.height() - 2);
+                        }
+                        clickSound();
+                        return true;
+                    }
+                    case Action a -> {
+                        if (mx >= right - 74) {
+                            clickSound();
+                            a.run().run();
+                            return true;
+                        }
+                    }
                     default -> {
                     }
                 }
@@ -316,6 +467,7 @@ public class SettingsScreen extends ThemedScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        picker = null;
         scroll = MathHelper.clamp(scroll - verticalAmount * 14, 0.0, maxScroll());
         return true;
     }

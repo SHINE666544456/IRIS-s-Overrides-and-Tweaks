@@ -1,33 +1,45 @@
 # IRIS'S Overrides and Tweaks (Fabric, Minecraft 1.21.11)
 
-Version 1.0.3.
+Version 1.1.0.
 
 A **client-side only** mod. Press **K** to open a GUI, pick any player, and change how their skin looks **on your screen**. No server mod needed, and nobody else sees the change.
 
 ## Features
-Press **K** for skins, **J** for settings (both rebindable under Controls).
+Press **K** for skins and **J** for settings. Other keys (all rebindable under Controls, search "IRIS"): **C** zoom (hold), **G** fullbright, **F9** clean screenshot.
 
 **Skins**
-- 3D preview of the selected player. Hover a skin to preview it before applying.
+- 3D preview of the selected player; hover a skin to preview it before applying.
 - Add skins by dragging a `.png` (e.g. from The Skindex) onto the window, dropping it in `config/skinoverride/skins/`, or typing a Minecraft username and pressing **Download skin**.
-- Everything is remembered: assignments are saved by player UUID, the GUI reopens on your last player, and **Restore last** brings back a player's previous skin after a reset.
-- Looking at a player when you press K opens the GUI with them selected.
+- Assignments are saved by player UUID, the GUI reopens on your last player, and **Restore last** brings back a player's previous skin.
 - Per-player model override (auto / wide / slim). Capes and elytra are kept from the real account.
 
-**HUD** (all movable: Settings -> Edit HUD layout, drag with the mouse, edges and center snap)
-- **Armor & held items:** worn armor, main hand and off hand with durability numbers or percent. Slots flash red when durability is low.
-- **Effect timers:** replaces the vanilla effect icons with name, level and countdown; flashes red when about to run out.
-- **Crosshair inspect:** a panel for the player you are looking at: health, held/worn items and their enchantments. Off by default; enable it in Settings.
-- **AFK list:** optional small list of players currently AFK.
+**HUD** (all movable: Settings -> Edit HUD layout, drag with the mouse; edges and center snap)
+- **Armor & held items:** horizontal row or vertical column (so it can sit beside the hotbar), durability numbers or percent, flashing red when low.
+- **Effect timers:** icon, name, level and countdown; flashes red when about to run out.
+- **Coordinates & FPS:** XYZ, facing direction, FPS and ping in one small panel.
+- **Crosshair inspect:** health, held/worn items and enchantments of the player you look at (off by default).
+- **AFK list:** optional list of players currently AFK.
 
-**AFK detection**
-- Players you can see are marked AFK after they stand still and stop turning for a configurable time. The tag shows in the skin screen, the inspect overlay and the optional HUD list.
+**AFK detection:** players you can see are marked AFK after standing still for a configurable time. Shown as a tag above their head, in the skin screen, the inspect overlay and the optional HUD list.
 
-**Settings screen:** toggles, sliders and option cyclers for every feature above.
+**Chat** (Settings -> Chat)
+- Name and message colors for everyone, or per player (Settings -> Chat -> Per-player colors). Colors can be solid, **rainbow** (every letter) or **color cycle** (each new message gets the next color).
+- Separate colors for join, leave, advancement and death messages.
+- **Emotes:** type `:smile:`, `:heart:`, `:fire:` ... and 16 built-in pixel emotes appear (optionally also `:)` `<3`). Only you see them.
+- **Speech bubbles:** chat messages float above nearby players' heads.
+- **Text to speech:** turns on Minecraft's built-in narrator for chat (voice comes from your OS).
+
+**Visuals** (Settings -> Visuals)
+- Reveal invisible players and mobs (client-side only).
+- Fullbright toggle.
+- Zoom: hold **C**, scroll to change the zoom level, optional smooth camera.
+- **Clean screenshot:** hides the whole HUD (hotbar, chat, crosshair and all mod overlays); player name tags stay.
 
 ## Limits
 - Skins only change on your own screen. Other players keep seeing the real skin.
 - Inspect and the 3D slots only work for players loaded in your world, and only show held/worn items: servers never send other players' inventories to your client, so no client mod can show them.
+- Chat colors and emotes need servers that send normal chat messages; some chat plugins format messages in ways that can't be recolored. Colors are fixed when a message arrives, so rainbow does not animate.
+- Speech bubbles and AFK tags are drawn from the camera's point of view and can be slightly off while your field of view is changing (sprinting, effects).
 - AFK detection only watches players near you. A player starts counting from the moment you first see them, and being pushed (water, pistons) counts as moving.
 - Mojang rate-limits username lookups; wait a minute if one fails.
 - Mixins use Yarn names for 1.21.11. Other Minecraft versions need updates.
@@ -53,6 +65,6 @@ git push -u origin main
 ```
 Every push builds the mod with GitHub Actions (download the jar from the run's **Artifacts**). To publish a release jar:
 ```
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.1.0
+git push origin v1.1.0
 ```
