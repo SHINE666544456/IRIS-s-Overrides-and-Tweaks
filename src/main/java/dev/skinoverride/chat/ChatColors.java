@@ -33,7 +33,9 @@ public final class ChatColors {
             new Swatch("Blue", 0x5555FF), new Swatch("Navy", 0x0000AA),
             new Swatch("Lavender", 0xB69CFF), new Swatch("Purple", 0xAA00AA),
             new Swatch("Magenta", 0xFF55FF), new Swatch("Pink", 0xFF9EC8),
-            new Swatch("Coral", 0xFF7F7F), new Swatch("Brown", 0xC08040)
+            new Swatch("Coral", 0xFF7F7F), new Swatch("Brown", 0xC08040),
+            new Swatch("Sakura", 0xFFB7D5), new Swatch("Rose", 0xFF4FA3),
+            new Swatch("Blush", 0xFFD1E3)
     };
 
     private ChatColors() {

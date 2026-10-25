@@ -2,7 +2,7 @@ package dev.skinoverride;
 
 import net.minecraft.client.MinecraftClient;
 
-/** Hold-to-zoom with smooth easing, scroll to change the zoom level. */
+/** Hold-to-zoom, instant in and out (no easing), scroll to change the zoom level. */
 public final class Zoom {
 
     private static float prev = 1f;
@@ -20,14 +20,12 @@ public final class Zoom {
             factor = ModConfig.get().zoomDefault;
         }
         held = keyDown && mc.currentScreen == null && mc.player != null;
+        // No animation: the zoom jumps straight to its target so nothing sweeps across the screen.
         float target = held ? factor : 1f;
-        prev = cur;
-        cur += (target - cur) * 0.4f;
-        if (Math.abs(target - cur) < 0.01f) {
-            cur = target;
-        }
+        prev = target;
+        cur = target;
 
-        boolean wantSmooth = held && ModConfig.get().zoomSmoothCamera;
+        boolean wantSmooth = held && ModConfig.get().zoomCinematic;
         if (wantSmooth && !smoothApplied) {
             smoothBefore = mc.options.smoothCameraEnabled;
             mc.options.smoothCameraEnabled = true;

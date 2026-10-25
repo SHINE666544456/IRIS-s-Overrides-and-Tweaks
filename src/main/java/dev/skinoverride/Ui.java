@@ -4,15 +4,20 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Util;
 
-/** Shared look: dark navy panels, teal accent, slightly rounded corners. */
+/** Shared look: dark panels, an accent color and slightly rounded corners. Colors follow the Theme settings. */
 public final class Ui {
 
-    public static final int ACCENT = 0xFF35D0BA;
-    public static final int ACCENT_DIM = 0xFF1E7F72;
-    public static final int BG = 0xE0111420;
-    public static final int BG_LIGHT = 0xE01B2132;
-    public static final int BG_HOVER = 0xE0283149;
-    public static final int BORDER = 0xFF2B3347;
+    // theme colors (recomputed by applyTheme)
+    public static int ACCENT = 0xFF35D0BA;
+    public static int ACCENT_DIM = 0xFF1E7F72;
+    public static int ACCENT_FILL = 0xFF1E8F80;
+    public static int ACCENT_FILL_HOVER = 0xFF2FB7A3;
+    public static int BG = 0xE0111420;
+    public static int BG_LIGHT = 0xE01B2132;
+    public static int BG_HOVER = 0xE0283149;
+    public static int BORDER = 0xFF2B3347;
+    public static int HEADER_TOP = 0xC0213047;
+
     public static final int TEXT = 0xFFE8ECF4;
     public static final int MUTED = 0xFF8A93A8;
     public static final int GOOD = 0xFF56D364;
@@ -21,6 +26,39 @@ public final class Ui {
 
     private Ui() {
     }
+
+    // ---------- color math ----------
+
+    public static int mix(int a, int b, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        int r = Math.round(((a >> 16) & 0xFF) * (1 - t) + ((b >> 16) & 0xFF) * t);
+        int g = Math.round(((a >> 8) & 0xFF) * (1 - t) + ((b >> 8) & 0xFF) * t);
+        int bl = Math.round((a & 0xFF) * (1 - t) + (b & 0xFF) * t);
+        return (r << 16) | (g << 8) | bl;
+    }
+
+    public static int withAlpha(int rgb, int alpha) {
+        return ((alpha & 0xFF) << 24) | (rgb & 0xFFFFFF);
+    }
+
+    /** Recomputes every theme color from the settings. */
+    public static void applyTheme(ModConfig cfg) {
+        int accent = cfg.themeAccent & 0xFFFFFF;
+        int bg = cfg.themeBg & 0xFFFFFF;
+        int alpha = Math.max(30, Math.min(100, cfg.themeOpacity)) * 255 / 100;
+
+        ACCENT = 0xFF000000 | accent;
+        ACCENT_DIM = 0xFF000000 | mix(accent, 0x000000, 0.45f);
+        ACCENT_FILL = 0xFF000000 | mix(accent, 0x000000, 0.40f);
+        ACCENT_FILL_HOVER = 0xFF000000 | mix(accent, 0x000000, 0.22f);
+        BG = withAlpha(bg, alpha);
+        BG_LIGHT = withAlpha(mix(bg, 0xFFFFFF, 0.06f), alpha);
+        BG_HOVER = withAlpha(mix(bg, accent, 0.22f), alpha);
+        BORDER = 0xFF000000 | mix(mix(bg, 0xFFFFFF, 0.12f), accent, 0.18f);
+        HEADER_TOP = withAlpha(mix(bg, accent, 0.30f), 0xC0);
+    }
+
+    // ---------- drawing ----------
 
     public static void roundRect(DrawContext c, int x, int y, int w, int h, int color) {
         c.fill(x + 1, y, x + w - 1, y + h, color);
@@ -47,7 +85,7 @@ public final class Ui {
 
     /** Title strip with a soft gradient and an accent underline. */
     public static void header(DrawContext c, TextRenderer tr, String title, int x, int y, int w) {
-        c.fillGradient(x, y, x + w, y + 16, 0xC0213047, 0x00213047);
+        c.fillGradient(x, y, x + w, y + 16, HEADER_TOP, HEADER_TOP & 0x00FFFFFF);
         c.fill(x, y + 15, x + w, y + 16, ACCENT_DIM);
         c.fill(x, y + 15, x + Math.min(w, 28), y + 16, ACCENT);
         text(c, tr, title, x + 6, y + 4, TEXT);
@@ -63,7 +101,7 @@ public final class Ui {
             border = 0xFF222838;
             textColor = 0xFF5A6277;
         } else if (primary) {
-            fill = hovered ? 0xFF2FB7A3 : 0xFF1E8F80;
+            fill = hovered ? ACCENT_FILL_HOVER : ACCENT_FILL;
             border = ACCENT;
             textColor = 0xFFFFFFFF;
         } else {

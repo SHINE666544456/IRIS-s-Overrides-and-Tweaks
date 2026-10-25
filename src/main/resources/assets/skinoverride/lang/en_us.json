@@ -3,5 +3,7 @@
   "key.skinoverride.settings": "Open IRIS'S Overrides and Tweaks settings",
   "key.skinoverride.zoom": "Zoom (hold)",
   "key.skinoverride.fullbright": "Toggle fullbright",
-  "key.skinoverride.cleanshot": "Clean screenshot (no HUD)"
+  "key.skinoverride.cleanshot": "Clean screenshot (no HUD)",
+  "key.skinoverride.freecam": "Toggle freecam",
+  "key.skinoverride.light": "Toggle light level overlay"
 }

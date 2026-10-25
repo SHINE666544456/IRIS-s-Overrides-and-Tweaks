@@ -338,7 +338,7 @@ public class SkinOverrideScreen extends ThemedScreen {
             boolean selected = row.id().equals(selectedPlayer);
             boolean hovered = Ui.inside(mouseX, mouseY, lx, y, lw, ROW_H) && mouseY >= TOP && mouseY < bottom;
             if (selected) {
-                Ui.roundRect(context, lx + 3, y, lw - 6, ROW_H, 0x8035D0BA);
+                Ui.roundRect(context, lx + 3, y, lw - 6, ROW_H, Ui.withAlpha(Ui.ACCENT, 0x80));
             } else if (hovered) {
                 Ui.roundRect(context, lx + 3, y, lw - 6, ROW_H, 0x40FFFFFF);
             }

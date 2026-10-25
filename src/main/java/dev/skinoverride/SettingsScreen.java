@@ -19,7 +19,7 @@ import java.util.function.IntSupplier;
 /** Tabbed settings screen: toggles, sliders, color pickers and option cyclers for every feature. */
 public class SettingsScreen extends ThemedScreen {
 
-    private sealed interface Row permits Header, Note, Toggle, Slider, Cycle, ColorRow, Action, EmoteGrid {
+    private sealed interface Row permits Header, Note, Toggle, Slider, Cycle, ColorRow, Action, EmoteGrid, ArmorGrid {
     }
 
     private record Header(String text) implements Row {
@@ -38,7 +38,11 @@ public class SettingsScreen extends ThemedScreen {
     private record Cycle(String label, String desc, String[] options, IntSupplier get, IntConsumer set) implements Row {
     }
 
-    private record ColorRow(String label, String desc, IntSupplier get, IntConsumer set) implements Row {
+    /** plain = only real colors (no auto / rainbow / cycle), used by the GUI theme. */
+    private record ColorRow(String label, String desc, IntSupplier get, IntConsumer set, boolean plain) implements Row {
+        ColorRow(String label, String desc, IntSupplier get, IntConsumer set) {
+            this(label, desc, get, set, false);
+        }
     }
 
     private record Action(String label, String desc, String button, Runnable run) implements Row {
@@ -47,7 +51,11 @@ public class SettingsScreen extends ThemedScreen {
     private record EmoteGrid() implements Row {
     }
 
-    private static final String[] TABS = {"HUD", "Inspect", "AFK", "Chat", "Visuals"};
+    private record ArmorGrid() implements Row {
+    }
+
+    private static final String[] TABS = {"HUD", "Info", "Inspect", "AFK", "Chat", "Visuals", "Combat", "Theme"};
+    private static final int TAB_STEP = 18;
     private static final int TAB_W = 78;
     private static final int SLIDER_W = 100;
 
@@ -72,6 +80,25 @@ public class SettingsScreen extends ThemedScreen {
 
     // ---------- rows ----------
 
+    private static final String[] PRESET_NAMES = {
+            "Custom", "Teal", "Violet", "Ocean", "Rose", "Amber", "Forest", "Mono", "Cherry Blossom", "Pink Night"
+    };
+    // accent, background for presets 1..7
+    private static final int[][] PRESETS = {
+            {0x35D0BA, 0x111420}, {0xA78BFA, 0x15121F}, {0x4DA3FF, 0x0F1724}, {0xFF6B9D, 0x1E1218},
+            {0xFFB347, 0x1C1710}, {0x5BD66F, 0x111A14}, {0xD0D4DC, 0x15161A},
+            {0xFFB7D5, 0x1D1218}, {0xFF4FA3, 0x111420}
+    };
+
+    private void applyPreset(int index) {
+        cfg.themePreset = index;
+        if (index > 0 && index <= PRESETS.length) {
+            cfg.themeAccent = PRESETS[index - 1][0];
+            cfg.themeBg = PRESETS[index - 1][1];
+        }
+        Ui.applyTheme(cfg);
+    }
+
     private List<Row> rows() {
         List<Row> r = new ArrayList<>();
         switch (tab) {
@@ -95,10 +122,34 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Header("Effect timers"));
                 r.add(new Toggle("Custom effect timers", "Replaces the vanilla effect icons.",
                         () -> cfg.effectsHud, v -> cfg.effectsHud = v));
+                r.add(new Note("The bar drains from green to yellow, orange and red as time runs out."));
                 r.add(new Toggle("Flash when low", "Blinks red as the effect runs out.",
                         () -> cfg.effectsFlash, v -> cfg.effectsFlash = v));
                 r.add(new Slider("Low at", "Seconds left before it counts as low.", 3, 30, 1,
                         v -> v + "s", () -> cfg.effectsLowSeconds, v -> cfg.effectsLowSeconds = v));
+                r.add(new Header("Keystrokes & CPS"));
+                r.add(new Toggle("Show keystrokes", "WASD that lights up when you press it.",
+                        () -> cfg.keystrokesHud, v -> cfg.keystrokesHud = v));
+                r.add(new Toggle("Space bar", "Jump key.",
+                        () -> cfg.keystrokesSpace, v -> cfg.keystrokesSpace = v));
+                r.add(new Toggle("Mouse buttons", "LMB and RMB.",
+                        () -> cfg.keystrokesMouse, v -> cfg.keystrokesMouse = v));
+                r.add(new Toggle("Clicks per second", "CPS under each mouse button.",
+                        () -> cfg.keystrokesCps, v -> cfg.keystrokesCps = v));
+                r.add(new Header("Join / leave pop-ups"));
+                r.add(new Toggle("Pop-ups", "A small notice when a player joins or leaves.",
+                        () -> cfg.notifyPopups, v -> cfg.notifyPopups = v));
+                r.add(new Toggle("Joins", "When someone comes online.",
+                        () -> cfg.notifyJoin, v -> cfg.notifyJoin = v));
+                r.add(new Toggle("Leaves", "When someone goes offline.",
+                        () -> cfg.notifyLeave, v -> cfg.notifyLeave = v));
+                r.add(new Toggle("Sound", "A soft click with each pop-up.",
+                        () -> cfg.notifySound, v -> cfg.notifySound = v));
+                r.add(new Toggle("Only my listed players", "Only players with custom colors (Chat > Per-player).",
+                        () -> cfg.notifyOnlyListed, v -> cfg.notifyOnlyListed = v));
+                r.add(new Note("Every HUD element can be moved and resized: Edit HUD layout (below)."));
+            }
+            case 1 -> {
                 r.add(new Header("Coordinates & FPS"));
                 r.add(new Toggle("Show info panel", "A small movable panel.",
                         () -> cfg.infoHud, v -> cfg.infoHud = v));
@@ -110,9 +161,27 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.infoFps, v -> cfg.infoFps = v));
                 r.add(new Toggle("Ping", "Latency to the server.",
                         () -> cfg.infoPing, v -> cfg.infoPing = v));
-                r.add(new Note("Move or resize nothing by hand: use Edit HUD layout below."));
+                r.add(new Toggle("Light level", "Block and sky light where you stand.",
+                        () -> cfg.infoLight, v -> cfg.infoLight = v));
+                r.add(new Header("Day counter & clock"));
+                r.add(new Toggle("Day & time on HUD", "Permanent day counter with a ticking clock.",
+                        () -> cfg.clockHud, v -> cfg.clockHud = v));
+                r.add(new Toggle("Show seconds", "Exact ticking time of day.",
+                        () -> cfg.clockSeconds, v -> cfg.clockSeconds = v));
+                r.add(new Toggle("24-hour clock", "Off = AM / PM.",
+                        () -> cfg.clock24h, v -> cfg.clock24h = v));
+                r.add(new Toggle("Playtime line", "Total time played in this world / server.",
+                        () -> cfg.clockPlaytime, v -> cfg.clockPlaytime = v));
+                r.add(new Toggle("Info on the pause menu", "Day, exact time, sunset, playtime.",
+                        () -> cfg.pauseInfo, v -> cfg.pauseInfo = v));
+                r.add(new Header("Subtitles"));
+                r.add(new Toggle("Movable subtitles", "Replaces the vanilla sound captions.",
+                        () -> cfg.subtitlesHud, v -> cfg.subtitlesHud = v));
+                r.add(new Toggle("Show subtitles", "Minecraft's own subtitles option.",
+                        () -> this.client.options.getShowSubtitles().getValue(),
+                        v -> this.client.options.getShowSubtitles().setValue(v)));
             }
-            case 1 -> {
+            case 2 -> {
                 r.add(new Header("Crosshair inspect"));
                 r.add(new Toggle("Enable inspect overlay", "Shows gear of the player you look at.",
                         () -> cfg.inspectHud, v -> cfg.inspectHud = v));
@@ -125,7 +194,7 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Note("Only players you can see are shown, and only held/worn items:"));
                 r.add(new Note("servers never send other players' inventories to your client."));
             }
-            case 2 -> {
+            case 3 -> {
                 r.add(new Header("AFK detection"));
                 r.add(new Toggle("Enable AFK detection", "Watches nearby players for movement.",
                         () -> cfg.afkTracking, v -> cfg.afkTracking = v));
@@ -139,7 +208,7 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Note("Only players loaded near you can be watched. Being pushed"));
                 r.add(new Note("by water or pistons counts as moving."));
             }
-            case 3 -> {
+            case 4 -> {
                 r.add(new Header("Chat colors"));
                 r.add(new Toggle("Custom chat colors", "Master switch for the colors below.",
                         () -> cfg.chatCustom, v -> cfg.chatCustom = v));
@@ -147,7 +216,7 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.chatDefaultNameColor, v -> cfg.chatDefaultNameColor = v));
                 r.add(new ColorRow("Everyone's message color", "Used unless a player has their own.",
                         () -> cfg.chatDefaultMsgColor, v -> cfg.chatDefaultMsgColor = v));
-                r.add(new Action("Per-player colors", "Pick name and message colors per player.", "Open",
+                r.add(new Action("Per-player colors", "Set a name + message color for specific players.", "Open",
                         () -> this.client.setScreen(new ChatPlayersScreen(this))));
                 r.add(new ColorRow("Join messages", "\"X joined the game\".",
                         () -> cfg.chatJoinColor, v -> cfg.chatJoinColor = v));
@@ -165,6 +234,8 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Toggle("Text faces", "Also turn :) :D <3 into emotes.",
                         () -> cfg.chatEmoteFaces, v -> cfg.chatEmoteFaces = v));
                 r.add(new EmoteGrid());
+                r.add(new Note("Armor icons: letter + piece, like :Dchest: or :LLeg: (L C I G D N)."));
+                r.add(new ArmorGrid());
                 r.add(new Note("Only you see emotes. Animated GIFs can't be shown in chat text."));
                 r.add(new Header("Speech bubbles"));
                 r.add(new Toggle("Bubbles above heads", "Chat messages float above nearby players.",
@@ -178,7 +249,7 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.chatTts, Tts::set));
                 r.add(new Note("The voice and speed come from your operating system."));
             }
-            default -> {
+            case 5 -> {
                 r.add(new Header("World"));
                 r.add(new Toggle("Reveal invisible players", "Shows invisible players and mobs normally.",
                         () -> cfg.revealInvisible, v -> cfg.revealInvisible = v));
@@ -188,8 +259,38 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Header("Zoom"));
                 r.add(new Slider("Default zoom", "Hold C to zoom; scroll to change it.", 2, 10, 1,
                         v -> v + "x", () -> cfg.zoomDefault, v -> cfg.zoomDefault = v));
-                r.add(new Toggle("Smooth camera while zooming", "Steadier aiming when zoomed in.",
-                        () -> cfg.zoomSmoothCamera, v -> cfg.zoomSmoothCamera = v));
+                r.add(new Toggle("Cinematic camera", "Smooths the mouse while zoomed. Off = direct aim.",
+                        () -> cfg.zoomCinematic, v -> cfg.zoomCinematic = v));
+                r.add(new Note("Zoom is instant: no animation, no pulling effect."));
+                r.add(new Header("Freecam"));
+                r.add(new Action("Toggle freecam", "Fly the camera around while your player stays put. Key: F8.", "Toggle",
+                        () -> {
+                            this.client.setScreen(null);
+                            Freecam.toggle(this.client);
+                        }));
+                r.add(new Slider("Flight speed", "Blocks per second (scroll while flying; sprint = x3).", 1, 100, 1,
+                        v -> v + " b/s", () -> cfg.freecamSpeed, v -> cfg.freecamSpeed = v));
+                r.add(new Toggle("Show your player", "Draws your character where you left it.",
+                        () -> cfg.freecamShowBody, v -> cfg.freecamShowBody = v));
+                r.add(new Toggle("Block actions", "No mining, placing or picking while flying.",
+                        () -> cfg.freecamBlockActions, v -> cfg.freecamBlockActions = v));
+                r.add(new Toggle("Exit when hurt", "Leave freecam if you take damage.",
+                        () -> cfg.freecamDamageOff, v -> cfg.freecamDamageOff = v));
+                r.add(new Toggle("Indicator", "Small FREECAM label with the speed.",
+                        () -> cfg.freecamIndicator, v -> cfg.freecamIndicator = v));
+                r.add(new Header("Light level"));
+                r.add(new Toggle("Light overlay", "Colored squares on the floor. Key: F7.",
+                        () -> cfg.lightOverlay, v -> cfg.lightOverlay = v));
+                r.add(new Note("Red = 0 (mobs can spawn), yellow = 1-7, green = 8 and up."));
+                r.add(new Slider("Overlay radius", "How far around you.", 3, 10, 1,
+                        v -> v + " blocks", () -> cfg.lightRadius, v -> cfg.lightRadius = v));
+                r.add(new Toggle("Show numbers", "The light number on close squares.",
+                        () -> cfg.lightNumbers, v -> cfg.lightNumbers = v));
+                r.add(new Header("Nametags"));
+                r.add(new ColorRow("Nametag color", "For everyone (per-player colors override it).",
+                        () -> cfg.nametagDefaultColor, v -> cfg.nametagDefaultColor = v));
+                r.add(new Action("Per-player nametags", "Pick a nametag color for specific players.", "Open",
+                        () -> this.client.setScreen(new ChatPlayersScreen(this))));
                 r.add(new Header("Screenshots"));
                 r.add(new Action("Clean screenshot", "Hides the HUD; player name tags stay. Key: F9.", "Take now",
                         () -> {
@@ -197,6 +298,77 @@ public class SettingsScreen extends ThemedScreen {
                             CleanScreenshot.request(this.client);
                         }));
                 r.add(new Note("Keys can be changed under Options > Controls (search \"IRIS\")."));
+            }
+            case 6 -> {
+                r.add(new Header("Damage numbers"));
+                r.add(new Toggle("Damage numbers", "Numbers float up from what you hit.",
+                        () -> cfg.dmgNumbers, v -> cfg.dmgNumbers = v));
+                r.add(new Toggle("Only my hits", "Only creatures you were attacking. Off = all damage nearby.",
+                        () -> cfg.dmgOnlyMine, v -> cfg.dmgOnlyMine = v));
+                r.add(new Toggle("Show healing", "Green +numbers (needs Only my hits off).",
+                        () -> cfg.dmgShowHeal, v -> cfg.dmgShowHeal = v));
+                r.add(new Toggle("Decimals", "4.5 instead of rounding to whole numbers.",
+                        () -> cfg.dmgDecimals, v -> cfg.dmgDecimals = v));
+                r.add(new Slider("Size", "How big the numbers are.", 5, 30, 1,
+                        v -> String.format(java.util.Locale.ROOT, "%.1fx", v / 10.0),
+                        () -> cfg.dmgSize, v -> cfg.dmgSize = v));
+                r.add(new Slider("Duration", "How long a number floats.", 5, 30, 1,
+                        v -> String.format(java.util.Locale.ROOT, "%.1fs", v / 10.0),
+                        () -> cfg.dmgDuration, v -> cfg.dmgDuration = v));
+                r.add(new ColorRow("Color", "Auto = white, yellow, orange, red by damage.",
+                        () -> cfg.dmgColor, v -> cfg.dmgColor = v));
+                r.add(new Header("Hit flash"));
+                r.add(new Toggle("Custom hit flash", "Recolor the red tint on creatures you hurt.",
+                        () -> cfg.hitColorOn, v -> cfg.hitColorOn = v));
+                r.add(new ColorRow("Flash color", "Auto = vanilla red. Rainbow and cycle animate.",
+                        () -> cfg.hitColor, v -> cfg.hitColor = v));
+                r.add(new Slider("Flash strength", "How strong the tint is (vanilla is 70%).", 10, 100, 5,
+                        v -> v + "%", () -> cfg.hitOpacity, v -> cfg.hitOpacity = v));
+                r.add(new Header("Crosshair"));
+                r.add(new Cycle("Style", "Vanilla keeps the game's crosshair and attack indicator.",
+                        Crosshair.STYLES, () -> cfg.crosshairStyle, v -> cfg.crosshairStyle = v));
+                r.add(new Slider("Size", "Length or size of the shape.", 1, 12, 1,
+                        v -> v + " px", () -> cfg.crosshairSize, v -> cfg.crosshairSize = v));
+                r.add(new Slider("Thickness", "Line thickness.", 1, 4, 1,
+                        v -> v + " px", () -> cfg.crosshairThickness, v -> cfg.crosshairThickness = v));
+                r.add(new Slider("Gap", "Space in the middle.", 0, 8, 1,
+                        v -> v + " px", () -> cfg.crosshairGap, v -> cfg.crosshairGap = v));
+                r.add(new ColorRow("Color", "Auto = white.",
+                        () -> cfg.crosshairColor, v -> cfg.crosshairColor = v));
+                r.add(new Toggle("Outline", "A thin black edge so it shows on any background.",
+                        () -> cfg.crosshairOutline, v -> cfg.crosshairOutline = v));
+                r.add(new Toggle("Red on target", "Turns red while you aim at something.",
+                        () -> cfg.crosshairTargetColor, v -> cfg.crosshairTargetColor = v));
+                r.add(new Toggle("Hit marker", "A red X flashes when you land a hit.",
+                        () -> cfg.crosshairHitMarker, v -> cfg.crosshairHitMarker = v));
+                r.add(new Header("Hotbar cooldowns"));
+                r.add(new Toggle("Cooldown overlay", "A colored wipe over items on cooldown.",
+                        () -> cfg.cooldownOverlay, v -> cfg.cooldownOverlay = v));
+                r.add(new Toggle("Seconds left", "The remaining time on the item.",
+                        () -> cfg.cooldownNumbers, v -> cfg.cooldownNumbers = v));
+                r.add(new Toggle("Ready flash", "A green flash when the item is usable again.",
+                        () -> cfg.cooldownReadyFlash, v -> cfg.cooldownReadyFlash = v));
+                r.add(new ColorRow("Overlay color", "Auto = your theme accent.",
+                        () -> cfg.cooldownColor, v -> cfg.cooldownColor = v));
+                r.add(new Note("Only your own screen changes: other players see nothing different."));
+            }
+            default -> {
+                r.add(new Header("GUI colors"));
+                r.add(new Cycle("Preset", "Quick color schemes for every IRIS menu and HUD box.",
+                        PRESET_NAMES, () -> cfg.themePreset, this::applyPreset));
+                r.add(new ColorRow("Accent color", "Buttons, highlights, bars and tags.",
+                        () -> cfg.themeAccent, v -> {
+                            cfg.themeAccent = v;
+                            cfg.themePreset = 0;
+                        }, true));
+                r.add(new ColorRow("Background color", "Panels and HUD boxes.",
+                        () -> cfg.themeBg, v -> {
+                            cfg.themeBg = v;
+                            cfg.themePreset = 0;
+                        }, true));
+                r.add(new Slider("Panel opacity", "How see-through panels are.", 30, 100, 5,
+                        v -> v + "%", () -> cfg.themeOpacity, v -> cfg.themeOpacity = v));
+                r.add(new Note("Changes apply instantly to this menu, the skin screen and all HUD elements."));
             }
         }
         return r;
@@ -210,7 +382,10 @@ public class SettingsScreen extends ThemedScreen {
             return 11;
         }
         if (row instanceof EmoteGrid) {
-            return 4 * 13 + 6;
+            return ((Emotes.NAMES.length + 3) / 4) * 13 + 6;
+        }
+        if (row instanceof ArmorGrid) {
+            return 12 + 6 * 12 + 4;
         }
         return 28;
     }
@@ -254,12 +429,12 @@ public class SettingsScreen extends ThemedScreen {
         Ui.header(c, this.textRenderer, "IRIS'S Overrides and Tweaks  /  Settings", px + 1, py + 1, pw - 2);
 
         for (int i = 0; i < TABS.length; i++) {
-            int ty = py + 22 + i * 24;
+            int ty = py + 22 + i * TAB_STEP;
             boolean sel = i == tab;
-            boolean hov = Ui.inside(mouseX, mouseY, px + 4, ty, TAB_W, 20);
-            Ui.roundRect(c, px + 4, ty, TAB_W, 20, sel ? 0xFF1E8F80 : hov ? Ui.BG_HOVER : Ui.BG_LIGHT);
-            Ui.roundBorder(c, px + 4, ty, TAB_W, 20, sel ? Ui.ACCENT : Ui.BORDER);
-            Ui.text(c, this.textRenderer, TABS[i], px + 12, ty + 6, sel ? 0xFFFFFFFF : Ui.TEXT);
+            boolean hov = Ui.inside(mouseX, mouseY, px + 4, ty, TAB_W, 16);
+            Ui.roundRect(c, px + 4, ty, TAB_W, 16, sel ? Ui.ACCENT_FILL : hov ? Ui.BG_HOVER : Ui.BG_LIGHT);
+            Ui.roundBorder(c, px + 4, ty, TAB_W, 16, sel ? Ui.ACCENT : Ui.BORDER);
+            Ui.text(c, this.textRenderer, TABS[i], px + 12, ty + 4, sel ? 0xFFFFFFFF : Ui.TEXT);
         }
 
         List<Row> rows = rows();
@@ -280,7 +455,7 @@ public class SettingsScreen extends ThemedScreen {
         drawButtons(c, mouseX, mouseY);
 
         if (picker != null) {
-            ColorPicker.draw(c, this.textRenderer, pickerX, pickerY, mouseX, mouseY, picker.get().getAsInt());
+            ColorPicker.draw(c, this.textRenderer, pickerX, pickerY, mouseX, mouseY, picker.get().getAsInt(), picker.plain());
         }
     }
 
@@ -338,6 +513,21 @@ public class SettingsScreen extends ThemedScreen {
                 boolean hov = Ui.inside(mouseX, mouseY, right - 70, y + 4, 70, 18);
                 Ui.button(c, tr, right - 70, y + 4, 70, 18, a.button(), hov, true, true);
             }
+            case ArmorGrid g -> {
+                int labelW = 74;
+                int cell = Math.max(24, (contentW - labelW - 16) / 4);
+                for (int p = 0; p < 4; p++) {
+                    Ui.text(c, tr, Emotes.PIECE_NAMES[p], contentX + labelW + p * cell, y + 1, Ui.MUTED);
+                }
+                for (int m = 0; m < 6; m++) {
+                    int ey = y + 12 + m * 12;
+                    Ui.text(c, tr, Emotes.MATERIAL_LETTERS[m] + "  " + Emotes.MATERIAL_NAMES[m], contentX + 6, ey, Ui.TEXT);
+                    for (int p = 0; p < 4; p++) {
+                        c.drawTextWithShadow(tr, Text.literal(String.valueOf(Emotes.armorGlyph(m, p))),
+                                contentX + labelW + p * cell, ey, 0xFFFFFFFF);
+                    }
+                }
+            }
             case EmoteGrid g -> {
                 int cell = (contentW - 12) / 4;
                 for (int i = 0; i < Emotes.NAMES.length; i++) {
@@ -364,7 +554,7 @@ public class SettingsScreen extends ThemedScreen {
         double my = click.y();
 
         if (picker != null) {
-            Integer chosen = ColorPicker.hit(mx, my, pickerX, pickerY);
+            Integer chosen = ColorPicker.hit(mx, my, pickerX, pickerY, picker.plain());
             if (chosen != null) {
                 picker.set().accept(chosen);
                 cfg.save();
@@ -375,7 +565,7 @@ public class SettingsScreen extends ThemedScreen {
         }
 
         for (int i = 0; i < TABS.length; i++) {
-            if (Ui.inside(mx, my, px + 4, py + 22 + i * 24, TAB_W, 20)) {
+            if (Ui.inside(mx, my, px + 4, py + 22 + i * TAB_STEP, TAB_W, 16)) {
                 if (tab != i) {
                     tab = i;
                     scroll = 0;
@@ -444,6 +634,7 @@ public class SettingsScreen extends ThemedScreen {
         double frac = MathHelper.clamp((mouseX - dragX) / SLIDER_W, 0.0, 1.0);
         int raw = s.min() + (int) Math.round((s.max() - s.min()) * frac / s.step()) * s.step();
         s.set().accept(MathHelper.clamp(raw, s.min(), s.max()));
+        Ui.applyTheme(cfg);
     }
 
     @Override

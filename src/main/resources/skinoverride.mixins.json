@@ -11,7 +11,11 @@
     "SimpleOptionAccessor",
     "ChatHudMixin",
     "GameRendererMixin",
-    "MouseMixin"
+    "MouseMixin",
+    "CameraMixin",
+    "EntityMixin",
+    "EntityRendererMixin",
+    "OverlayTextureAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

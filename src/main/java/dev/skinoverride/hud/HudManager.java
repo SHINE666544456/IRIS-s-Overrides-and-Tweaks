@@ -1,5 +1,9 @@
 package dev.skinoverride.hud;
 
+import dev.skinoverride.Crosshair;
+import dev.skinoverride.DamageNumbers;
+import dev.skinoverride.HotbarCooldowns;
+import dev.skinoverride.LightOverlay;
 import dev.skinoverride.ModConfig;
 import dev.skinoverride.SkinOverrideClient;
 import dev.skinoverride.WorldLabels;
@@ -8,20 +12,28 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
+import org.joml.Matrix3x2fStack;
 
 import java.util.List;
 
-/** Registers one HUD layer that draws every enabled widget at its saved position. */
+/** Registers one HUD layer that draws every enabled widget at its saved position and size. */
 public final class HudManager {
 
     public static final int PAD = 2;
+    public static final float MIN_SCALE = 0.5f;
+    public static final float MAX_SCALE = 3.0f;
 
     public static final List<HudWidget> WIDGETS = List.of(
             new InfoWidget(),
+            new ClockWidget(),
+            new KeystrokesWidget(),
+            new FreecamWidget(),
+            new NotificationWidget(),
             new ArmorWidget(),
             new EffectsWidget(),
             new InspectWidget(),
-            new AfkWidget());
+            new AfkWidget(),
+            new SubtitleWidget());
 
     private HudManager() {
     }
@@ -37,6 +49,21 @@ public final class HudManager {
                 VanillaHudElements.STATUS_EFFECTS,
                 original -> (context, tickCounter) -> {
                     if (!ModConfig.get().effectsHud) {
+                        original.render(context, tickCounter);
+                    }
+                });
+
+        // Custom crosshair styles (the vanilla crosshair is still used for the "Vanilla" style).
+        HudElementRegistry.replaceElement(
+                VanillaHudElements.CROSSHAIR,
+                original -> (context, tickCounter) ->
+                        Crosshair.render(context, MinecraftClient.getInstance(), () -> original.render(context, tickCounter)));
+
+        // Our movable subtitles replace the vanilla sound captions while enabled.
+        HudElementRegistry.replaceElement(
+                VanillaHudElements.SUBTITLES,
+                original -> (context, tickCounter) -> {
+                    if (!ModConfig.get().subtitlesHud) {
                         original.render(context, tickCounter);
                     }
                 });
@@ -57,13 +84,57 @@ public final class HudManager {
             if (w.width() <= 0 || w.height() <= 0) {
                 continue;
             }
-            int[] p = position(w, sw, sh, w.width(), w.height());
-            w.render(context, mc, p[0], p[1], false);
+            int[] p = position(w, sw, sh, scaledWidth(w), scaledHeight(w));
+            renderWidget(context, mc, w, p[0], p[1], false);
         }
+        LightOverlay.render(context, mc);
+        DamageNumbers.render(context, mc);
         WorldLabels.render(context, mc);
+        HotbarCooldowns.render(context, mc);
     }
 
-    /** Top-left pixel position of a widget of the given size. */
+    // ---------- size ----------
+
+    public static float scale(HudWidget w) {
+        Float s = ModConfig.get().hudScale.get(w.id());
+        return s == null ? 1f : Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
+    }
+
+    public static void setScale(HudWidget w, float scale) {
+        float clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.round(scale * 10f) / 10f));
+        if (Math.abs(clamped - 1f) < 0.01f) {
+            ModConfig.get().hudScale.remove(w.id());
+        } else {
+            ModConfig.get().hudScale.put(w.id(), clamped);
+        }
+    }
+
+    public static int scaledWidth(HudWidget w) {
+        return Math.round(w.width() * scale(w));
+    }
+
+    public static int scaledHeight(HudWidget w) {
+        return Math.round(w.height() * scale(w));
+    }
+
+    /** Draws a prepared widget with its top-left corner at (x, y), applying the widget's size setting. */
+    public static void renderWidget(DrawContext context, MinecraftClient mc, HudWidget w, int x, int y, boolean preview) {
+        float s = scale(w);
+        if (Math.abs(s - 1f) < 0.01f) {
+            w.render(context, mc, x, y, preview);
+            return;
+        }
+        Matrix3x2fStack m = context.getMatrices();
+        m.pushMatrix();
+        m.translate((float) x, (float) y);
+        m.scale(s, s);
+        w.render(context, mc, 0, 0, preview);
+        m.popMatrix();
+    }
+
+    // ---------- position ----------
+
+    /** Top-left pixel position of a widget of the given (already scaled) size. */
     public static int[] position(HudWidget w, int sw, int sh, int ww, int wh) {
         float[] f = ModConfig.get().positions.get(w.id());
         float fx = f == null || f.length < 2 ? w.defaultX() : f[0];
@@ -73,7 +144,7 @@ public final class HudManager {
         return new int[]{PAD + Math.round(fx * freeX), PAD + Math.round(fy * freeY)};
     }
 
-    /** Saves a widget's position from pixel coordinates. */
+    /** Saves a widget's position from pixel coordinates (size is the already scaled size). */
     public static void setPosition(HudWidget w, int x, int y, int sw, int sh, int ww, int wh) {
         int freeX = Math.max(1, sw - ww - PAD * 2);
         int freeY = Math.max(1, sh - wh - PAD * 2);
@@ -82,8 +153,9 @@ public final class HudManager {
         ModConfig.get().positions.put(w.id(), new float[]{fx, fy});
     }
 
-    public static void resetPositions() {
+    public static void resetLayout() {
         ModConfig.get().positions.clear();
+        ModConfig.get().hudScale.clear();
         ModConfig.get().save();
     }
 }

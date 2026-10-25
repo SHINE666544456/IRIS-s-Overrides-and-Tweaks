@@ -59,7 +59,8 @@ public final class ModConfig {
     public boolean revealInvisible = true;
     public boolean fullbright = false;
     public int zoomDefault = 4;
-    public boolean zoomSmoothCamera = true;
+    /** The vanilla cinematic camera makes the mouse feel slippery, so it is off by default. */
+    public boolean zoomCinematic = false;
 
     // chat
     public boolean chatCustom = true;
@@ -83,7 +84,90 @@ public final class ModConfig {
         public String name = "";
         public int nameColor = ChatColors.DEFAULT;
         public int msgColor = ChatColors.DEFAULT;
+        public int tagColor = ChatColors.DEFAULT;
     }
+
+    // subtitles
+    public boolean subtitlesHud = true;
+
+    // day counter / clock
+    public boolean clockHud = true;
+    public boolean clockSeconds = true;
+    public boolean clock24h = true;
+    public boolean clockPlaytime = false;
+    public boolean pauseInfo = true;
+
+    // nametags
+    public int nametagDefaultColor = ChatColors.DEFAULT;
+
+    // keystrokes / CPS
+    public boolean keystrokesHud = false;
+    public boolean keystrokesMouse = true;
+    public boolean keystrokesCps = true;
+    public boolean keystrokesSpace = true;
+
+    // join / leave pop-ups
+    public boolean notifyPopups = true;
+    public boolean notifyJoin = true;
+    public boolean notifyLeave = true;
+    public boolean notifySound = true;
+    public boolean notifyOnlyListed = false;
+
+    // light level
+    public boolean infoLight = false;
+    public boolean lightOverlay = false;
+    public int lightRadius = 6;
+    public boolean lightNumbers = true;
+
+    // freecam
+    public int freecamSpeed = 12;
+    public boolean freecamDamageOff = true;
+    public boolean freecamBlockActions = true;
+    public boolean freecamIndicator = true;
+    public boolean freecamShowBody = true;
+
+    // damage numbers
+    public boolean dmgNumbers = true;
+    public boolean dmgOnlyMine = true;
+    public boolean dmgShowHeal = false;
+    public boolean dmgDecimals = true;
+    /** size in tenths: 10 = normal */
+    public int dmgSize = 10;
+    /** how long a number floats, in tenths of a second */
+    public int dmgDuration = 12;
+    /** DEFAULT = color by damage */
+    public int dmgColor = ChatColors.DEFAULT;
+
+    // hit flash (the red tint on hurt entities)
+    public boolean hitColorOn = false;
+    public int hitColor = ChatColors.DEFAULT;
+    public int hitOpacity = 70;
+
+    // crosshair
+    /** 0 vanilla, 1 dot, 2 plus, 3 plus + dot, 4 circle, 5 square, 6 X */
+    public int crosshairStyle = 0;
+    public int crosshairSize = 5;
+    public int crosshairThickness = 1;
+    public int crosshairGap = 2;
+    public int crosshairColor = ChatColors.DEFAULT;
+    public boolean crosshairOutline = true;
+    public boolean crosshairTargetColor = true;
+    public boolean crosshairHitMarker = true;
+
+    // hotbar cooldowns
+    public boolean cooldownOverlay = true;
+    public boolean cooldownNumbers = true;
+    public boolean cooldownReadyFlash = true;
+    public int cooldownColor = ChatColors.DEFAULT;
+
+    // GUI theme
+    public int themePreset = 1;
+    public int themeAccent = 0x35D0BA;
+    public int themeBg = 0x111420;
+    public int themeOpacity = 88;
+
+    /** HUD element id -> size multiplier (1.0 = normal) */
+    public Map<String, Float> hudScale = new HashMap<>();
 
     /** HUD element id -> {x, y} as 0..1 fractions of the free screen space. */
     public Map<String, float[]> positions = new HashMap<>();
@@ -91,6 +175,7 @@ public final class ModConfig {
     public static ModConfig get() {
         if (instance == null) {
             instance = load();
+            Ui.applyTheme(instance);
         }
         return instance;
     }
@@ -111,6 +196,9 @@ public final class ModConfig {
                     if (read.chatPlayers == null) {
                         read.chatPlayers = new HashMap<>();
                     }
+                    if (read.hudScale == null) {
+                        read.hudScale = new HashMap<>();
+                    }
                     return read;
                 }
             } catch (Exception e) {
@@ -121,6 +209,7 @@ public final class ModConfig {
     }
 
     public void save() {
+        Ui.applyTheme(this);
         Path path = file();
         try {
             Files.createDirectories(path.getParent());

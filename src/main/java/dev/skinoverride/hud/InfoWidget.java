@@ -6,6 +6,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.world.LightType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +64,15 @@ public class InfoWidget implements HudWidget {
             float yaw = demo ? 180f : mc.player.getYaw();
             int index = (int) Math.floor(yaw * 4.0f / 360.0f + 0.5f) & 3;
             lines.add("Facing  " + DIRECTIONS[index]);
+        }
+        if (cfg.infoLight) {
+            if (demo || mc.world == null) {
+                lines.add("Light  7 (sky 15)");
+            } else {
+                var pos = mc.player.getBlockPos();
+                lines.add("Light  " + mc.world.getLightLevel(LightType.BLOCK, pos)
+                        + " (sky " + mc.world.getLightLevel(LightType.SKY, pos) + ")");
+            }
         }
         if (cfg.infoFps) {
             lines.add((demo ? 144 : mc.getCurrentFps()) + " FPS");

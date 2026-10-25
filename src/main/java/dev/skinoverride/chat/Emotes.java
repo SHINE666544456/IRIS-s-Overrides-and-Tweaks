@@ -11,19 +11,30 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Turns :smile: (and optionally :) <3 ...) into small pixel emotes drawn by the mod's built-in font.
- * Only YOU see the emotes: other players need this mod too, otherwise they see the plain text.
+ * Turns :smile: (and optionally :) <3 ...) into small pixel emotes drawn by the mod's built-in font,
+ * plus armor icons like :Dchest: (diamond chestplate) or :LLeg: (leather leggings).
+ * Only YOU see these: other players need this mod too, otherwise they see the plain text.
  */
 public final class Emotes {
 
-    /** Order matches the sprite sheet (4 x 4), starting at U+E000. */
+    /** Order matches the sprite sheet (8 per row), starting at U+E000. */
     public static final String[] NAMES = {
             "smile", "grin", "laugh", "wink", "cool", "cry", "angry", "wow",
-            "heart", "skull", "fire", "star", "thumbsup", "eyes", "zzz", "gg"
+            "heart", "skull", "fire", "star", "thumbsup", "eyes", "zzz", "gg",
+            "poggies"
     };
 
+    /** Armor icons start at this sprite index (6 materials x 4 pieces). */
+    public static final int ARMOR_START = 24;
+    public static final String[] MATERIAL_LETTERS = {"L", "C", "I", "G", "D", "N"};
+    public static final String[] MATERIAL_NAMES = {"Leather", "Chainmail", "Iron", "Gold", "Diamond", "Netherite"};
+    public static final String[] PIECE_NAMES = {"Helm", "Chest", "Leg", "Boot"};
+
     private static final Map<String, Integer> INDEX = new HashMap<>();
-    private static final Pattern NAMED = Pattern.compile(":([A-Za-z]{2,12}):");
+    private static final Pattern NAMED = Pattern.compile(":([A-Za-z_]{2,24}):");
+    private static final Pattern ARMOR_SHORT = Pattern.compile("^([lcigdn])(helm|helmet|chest|chestplate|leg|legs|leggings|boot|boots)$");
+    private static final Pattern ARMOR_LONG = Pattern.compile(
+            "^(leather|chain|chainmail|iron|gold|golden|diamond|netherite)_?(helmet|helm|chestplate|chest|leggings|legs|leg|boots|boot)$");
     private static final Pattern FACES = Pattern.compile(
             "(?<![^\\s])(:\\)|:D|xD|XD|;\\)|B\\)|:\\(|>:\\(|:O|:o|<3)(?![^\\s])");
     private static final Map<String, String> FACE_NAMES = new HashMap<>();
@@ -45,6 +56,9 @@ public final class Emotes {
         INDEX.put("look", 13);
         INDEX.put("dead", 9);
         INDEX.put("lit", 10);
+        INDEX.put("pog", 16);
+        INDEX.put("poggers", 16);
+        INDEX.put("poggies", 16);
 
         FACE_NAMES.put(":)", "smile");
         FACE_NAMES.put(":D", "grin");
@@ -66,12 +80,58 @@ public final class Emotes {
         return (char) (0xE000 + index);
     }
 
+    /** Glyph for material 0..5 (leather, chain, iron, gold, diamond, netherite) and piece 0..3 (helm, chest, leg, boot). */
+    public static char armorGlyph(int material, int piece) {
+        return glyph(ARMOR_START + material * 4 + piece);
+    }
+
+    private static int materialIndex(String m) {
+        return switch (m) {
+            case "l", "leather" -> 0;
+            case "c", "chain", "chainmail" -> 1;
+            case "i", "iron" -> 2;
+            case "g", "gold", "golden" -> 3;
+            case "d", "diamond" -> 4;
+            default -> 5;
+        };
+    }
+
+    private static int pieceIndex(String p) {
+        if (p.startsWith("helm")) {
+            return 0;
+        }
+        if (p.startsWith("chest")) {
+            return 1;
+        }
+        if (p.startsWith("leg")) {
+            return 2;
+        }
+        return 3;
+    }
+
+    /** Returns the sprite index for an emote or armor code (without the colons), or -1. */
+    public static int lookup(String code) {
+        String name = code.toLowerCase(Locale.ROOT);
+        Integer idx = INDEX.get(name);
+        if (idx != null) {
+            return idx;
+        }
+        Matcher m = ARMOR_SHORT.matcher(name);
+        if (!m.matches()) {
+            m = ARMOR_LONG.matcher(name);
+        }
+        if (m.matches()) {
+            return ARMOR_START + materialIndex(m.group(1)) * 4 + pieceIndex(m.group(2));
+        }
+        return -1;
+    }
+
     public static String replace(String s, boolean faces) {
         Matcher m = NAMED.matcher(s);
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
-            Integer idx = INDEX.get(m.group(1).toLowerCase(Locale.ROOT));
-            m.appendReplacement(sb, Matcher.quoteReplacement(idx == null ? m.group() : String.valueOf(glyph(idx))));
+            int idx = lookup(m.group(1));
+            m.appendReplacement(sb, Matcher.quoteReplacement(idx < 0 ? m.group() : String.valueOf(glyph(idx))));
         }
         m.appendTail(sb);
         String result = sb.toString();

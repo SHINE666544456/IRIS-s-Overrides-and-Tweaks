@@ -7,46 +7,58 @@ import net.minecraft.client.gui.DrawContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** A small grid of color swatches (auto, rainbow, cycle + 24 colors) drawn and hit-tested by hand. */
+/**
+ * A small grid of color swatches drawn and hit-tested by hand.
+ * Full mode: auto, rainbow, cycle + 24 colors (chat). Plain mode: just the 24 colors (GUI theme).
+ */
 public final class ColorPicker {
 
     public static final int CELL = 16;
     public static final int COLS = 9;
     public static final int PAD = 4;
 
-    private static final List<Integer> VALUES = new ArrayList<>();
+    private static final List<Integer> FULL = new ArrayList<>();
+    private static final List<Integer> PLAIN = new ArrayList<>();
 
     static {
-        VALUES.add(ChatColors.DEFAULT);
-        VALUES.add(ChatColors.RAINBOW);
-        VALUES.add(ChatColors.CYCLE);
+        FULL.add(ChatColors.DEFAULT);
+        FULL.add(ChatColors.RAINBOW);
+        FULL.add(ChatColors.CYCLE);
         for (ChatColors.Swatch s : ChatColors.PALETTE) {
-            VALUES.add(s.rgb());
+            FULL.add(s.rgb());
+            PLAIN.add(s.rgb());
         }
     }
 
     private ColorPicker() {
     }
 
-    private static int rows() {
-        return (VALUES.size() + COLS - 1) / COLS;
+    private static List<Integer> values(boolean plain) {
+        return plain ? PLAIN : FULL;
     }
 
     public static int width() {
         return COLS * CELL + PAD * 2;
     }
 
+    /** Height of the full picker (the plain one is never taller). */
     public static int height() {
-        return rows() * CELL + PAD * 2 + 12;
+        return ((FULL.size() + COLS - 1) / COLS) * CELL + PAD * 2 + 12;
     }
 
     public static void draw(DrawContext c, TextRenderer tr, int x, int y, int mouseX, int mouseY, int selected) {
+        draw(c, tr, x, y, mouseX, mouseY, selected, false);
+    }
+
+    public static void draw(DrawContext c, TextRenderer tr, int x, int y, int mouseX, int mouseY,
+                            int selected, boolean plain) {
+        List<Integer> values = values(plain);
         Ui.panel(c, x, y, width(), height());
         String hoverName = null;
-        for (int i = 0; i < VALUES.size(); i++) {
+        for (int i = 0; i < values.size(); i++) {
             int cx = x + PAD + (i % COLS) * CELL;
             int cy = y + PAD + (i / COLS) * CELL;
-            int v = VALUES.get(i);
+            int v = values.get(i);
             swatch(c, tr, cx + 1, cy + 1, CELL - 2, CELL - 2, v);
             if (v == selected) {
                 Ui.roundBorder(c, cx, cy, CELL, CELL, 0xFFFFFFFF);
@@ -60,20 +72,21 @@ public final class ColorPicker {
         c.drawTextWithShadow(tr, label, x + PAD + 1, y + height() - 12, hoverName != null ? Ui.TEXT : Ui.MUTED);
     }
 
-    /** Returns the chosen value, or null if the click was not on a swatch. */
     public static Integer hit(double mx, double my, int x, int y) {
-        for (int i = 0; i < VALUES.size(); i++) {
+        return hit(mx, my, x, y, false);
+    }
+
+    /** Returns the chosen value, or null if the click was not on a swatch. */
+    public static Integer hit(double mx, double my, int x, int y, boolean plain) {
+        List<Integer> values = values(plain);
+        for (int i = 0; i < values.size(); i++) {
             int cx = x + PAD + (i % COLS) * CELL;
             int cy = y + PAD + (i / COLS) * CELL;
             if (Ui.inside(mx, my, cx, cy, CELL, CELL)) {
-                return VALUES.get(i);
+                return values.get(i);
             }
         }
         return null;
-    }
-
-    public static boolean inside(double mx, double my, int x, int y) {
-        return Ui.inside(mx, my, x, y, width(), height());
     }
 
     /** One color preview box. */

@@ -5,6 +5,8 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
@@ -26,6 +28,8 @@ public class SkinOverrideClient implements ClientModInitializer {
     private static KeyBinding zoomKey;
     private static KeyBinding fullbrightKey;
     private static KeyBinding shotKey;
+    private static KeyBinding freecamKey;
+    private static KeyBinding lightKey;
 
     @Override
     public void onInitializeClient() {
@@ -45,13 +49,50 @@ public class SkinOverrideClient implements ClientModInitializer {
         shotKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.skinoverride.cleanshot", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F9, KeyBinding.Category.MISC));
 
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> Fullbright.restore());
+        freecamKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.skinoverride.freecam", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F8, KeyBinding.Category.MISC));
+        lightKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.skinoverride.light", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F7, KeyBinding.Category.MISC));
+
+        // Freecam must grab the movement keys before the game reads them.
+        ClientTickEvents.START_CLIENT_TICK.register(Freecam::startTick);
+
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            Fullbright.restore();
+            PlayTime.save();
+        });
+
+        // Day counter, clock and playtime on the pause menu.
+        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            if (screen instanceof GameMenuScreen) {
+                ScreenEvents.afterRender(screen).register((s, context, mouseX, mouseY, tickDelta) ->
+                        PauseInfo.render(context, client, tickDelta));
+            }
+        });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             AfkTracker.tick(client);
+            DayClock.tick(client);
+            Subtitles.ensureRegistered(client);
             Zoom.tick(client, zoomKey.isPressed());
             Fullbright.tick(client);
             CleanScreenshot.tick(client);
+            Notifications.tick(client);
+            LightOverlay.tick(client);
+            DamageNumbers.tick(client);
+            HitColor.tick(client);
+
+            while (freecamKey.wasPressed()) {
+                Freecam.toggle(client);
+            }
+            while (lightKey.wasPressed()) {
+                ModConfig cfg = ModConfig.get();
+                cfg.lightOverlay = !cfg.lightOverlay;
+                cfg.save();
+                if (client.player != null) {
+                    client.inGameHud.setOverlayMessage(Text.literal("Light overlay " + (cfg.lightOverlay ? "on" : "off")), false);
+                }
+            }
 
             while (fullbrightKey.wasPressed()) {
                 ModConfig cfg = ModConfig.get();
