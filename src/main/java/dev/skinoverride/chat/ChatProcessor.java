@@ -3,7 +3,14 @@ package dev.skinoverride.chat;
 import dev.skinoverride.ModConfig;
 import dev.skinoverride.SkinOverrideClient;
 import dev.skinoverride.WorldLabels;
+import dev.skinoverride.map.SharedWaypoints;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.text.MutableText;
+import net.minecraft.text.TextCodecs;
 import net.minecraft.text.Text;
 import net.minecraft.text.TranslatableTextContent;
 
@@ -24,11 +31,18 @@ public final class ChatProcessor {
     }
 
     public static Text process(Text original) {
+        Text result;
         try {
-            return doProcess(original, ModConfig.get());
+            result = doProcess(original, ModConfig.get());
         } catch (RuntimeException e) {
             SkinOverrideClient.LOGGER.warn("Chat processing failed, showing original message", e);
-            return original;
+            result = original;
+        }
+        try {
+            return ChatExtras.finish(result);
+        } catch (RuntimeException e) {
+            SkinOverrideClient.LOGGER.warn("Chat timestamp failed", e);
+            return result;
         }
     }
 
@@ -88,12 +102,24 @@ public final class ChatProcessor {
         Text msgText = asText(args[msgIdx]);
         String sender = nameText.getString();
 
+        String sharedWp = SharedWaypoints.scan(sender, msgText.getString());
+        if (sharedWp != null) {
+            msgText = Text.literal(sharedWp);
+        }
+        boolean mention = ChatExtras.isMention(sender, msgText.getString());
+
         int nameMode = ChatColors.DEFAULT;
         int msgMode = ChatColors.DEFAULT;
         if (cfg.chatCustom) {
             ModConfig.PlayerChat pc = lookup(sender, cfg);
             nameMode = pc != null && pc.nameColor != ChatColors.DEFAULT ? pc.nameColor : cfg.chatDefaultNameColor;
             msgMode = pc != null && pc.msgColor != ChatColors.DEFAULT ? pc.msgColor : cfg.chatDefaultMsgColor;
+        }
+        if (mention) {
+            ChatExtras.noteMention();
+            if (cfg.chatMentionHighlight) {
+                msgMode = cfg.chatMentionColor;
+            }
         }
         if (cfg.chatEmotes) {
             msgText = Emotes.apply(msgText, cfg.chatEmoteFaces);
@@ -111,6 +137,12 @@ public final class ChatProcessor {
         for (Text sibling : original.getSiblings()) {
             result.append(sibling);
         }
+        if (cfg.chatHeads && bubble) {
+            Text head = headFor(sender);
+            if (head != null) {
+                return Text.empty().append(head).append(Text.literal(" ")).append(result);
+            }
+        }
         return result;
     }
 
@@ -121,8 +153,14 @@ public final class ChatProcessor {
             return original;
         }
         String sender = m.group(1);
-        Text msg = Text.literal(m.group(2));
+        String body = m.group(2);
+        String sharedWp = SharedWaypoints.scan(sender, body);
+        if (sharedWp != null) {
+            body = sharedWp;
+        }
+        Text msg = Text.literal(body);
         Text name = Text.literal(sender);
+        boolean mention = ChatExtras.isMention(sender, body);
         if (cfg.chatEmotes) {
             msg = Emotes.apply(msg, cfg.chatEmoteFaces);
         }
@@ -133,11 +171,48 @@ public final class ChatProcessor {
             nameMode = pc != null && pc.nameColor != ChatColors.DEFAULT ? pc.nameColor : cfg.chatDefaultNameColor;
             msgMode = pc != null && pc.msgColor != ChatColors.DEFAULT ? pc.msgColor : cfg.chatDefaultMsgColor;
         }
+        if (mention) {
+            ChatExtras.noteMention();
+            if (cfg.chatMentionHighlight) {
+                msgMode = cfg.chatMentionColor;
+            }
+        }
         if (cfg.chatBubbles) {
             WorldLabels.push(sender, msg.getString());
         }
         return Text.literal("<").append(ChatColors.apply(name, nameMode)).append(Text.literal("> "))
                 .append(ChatColors.apply(msg, msgMode));
+    }
+
+    /**
+     * The game can draw a player's face inside any text (an "object" text component), so Chat Heads
+     * is just a small head in front of each line. Returns null if the sender is not an online player.
+     */
+    private static Text headFor(String sender) {
+        try {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.getNetworkHandler() == null) {
+                return null;
+            }
+            String low = sender.toLowerCase(Locale.ROOT);
+            for (PlayerListEntry entry : mc.getNetworkHandler().getPlayerList()) {
+                String name = entry.getProfile().name();
+                if (low.equals(name.toLowerCase(Locale.ROOT)) || java.util.Arrays.asList(low.split("[^a-z0-9_]+"))
+                        .contains(name.toLowerCase(Locale.ROOT))) {
+                    java.util.UUID id = entry.getProfile().id();
+                    long msb = id.getMostSignificantBits();
+                    long lsb = id.getLeastSignificantBits();
+                    String json = "{\"object\":\"player\",\"player\":{\"id\":["
+                            + (int) (msb >> 32) + "," + (int) msb + "," + (int) (lsb >> 32) + "," + (int) lsb
+                            + "]},\"hat\":true}";
+                    JsonElement element = JsonParser.parseString(json);
+                    return TextCodecs.CODEC.parse(JsonOps.INSTANCE, element).result().orElse(null);
+                }
+            }
+        } catch (RuntimeException e) {
+            // never break chat over a head
+        }
+        return null;
     }
 
     private static Text asText(Object o) {

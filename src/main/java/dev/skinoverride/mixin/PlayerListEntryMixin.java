@@ -1,6 +1,7 @@
 package dev.skinoverride.mixin;
 
 import com.mojang.authlib.GameProfile;
+import dev.skinoverride.Cosmetics;
 import dev.skinoverride.SkinStore;
 import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.entity.player.SkinTextures;
@@ -23,8 +24,12 @@ public abstract class PlayerListEntryMixin {
         if (profile == null) {
             return;
         }
-        SkinTextures custom = SkinStore.override(profile.id(), cir.getReturnValue());
-        if (custom != null) {
+        SkinTextures base = cir.getReturnValue();
+        SkinTextures custom = SkinStore.override(profile.id(), base);
+        SkinTextures cosmetic = Cosmetics.apply(profile.id(), custom != null ? custom : base);
+        if (cosmetic != null) {
+            cir.setReturnValue(cosmetic);
+        } else if (custom != null) {
             cir.setReturnValue(custom);
         }
     }

@@ -4,8 +4,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.ScreenshotRecorder;
 
 /**
- * Takes a screenshot with the whole HUD hidden (hotbar, chat, crosshair, our HUD elements, bubbles).
- * Player name tags are part of the world, so they stay visible.
+ * Takes a screenshot with the HUD hidden. What hides and what stays is up to you (Settings -> Visuals):
+ * the vanilla HUD, our HUD panels, waypoint labels, chat bubbles, damage numbers and the light overlay each have
+ * a switch. Player name tags are kept: the game normally hides them together with the HUD (F1), so while the
+ * shot is taken they are let through (a mixin on MinecraftClient.isHudEnabled).
  */
 public final class CleanScreenshot {
 
@@ -15,12 +17,19 @@ public final class CleanScreenshot {
     private CleanScreenshot() {
     }
 
+    /** True while a clean screenshot is being prepared (the last few frames before it is saved). */
+    public static boolean capturing() {
+        return ticksLeft > 0;
+    }
+
     public static void request(MinecraftClient mc) {
         if (ticksLeft > 0 || mc.currentScreen != null || mc.player == null) {
             return;
         }
         hudWasHidden = mc.options.hudHidden;
-        mc.options.hudHidden = true;
+        if (ModConfig.get().shotHideVanillaHud) {
+            mc.options.hudHidden = true;
+        }
         ticksLeft = 3; // let a few frames render without the HUD
     }
 

@@ -11,7 +11,9 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** All settings, saved to config/skinoverride/settings.json. Edited from the Settings screen. */
@@ -160,6 +162,116 @@ public final class ModConfig {
     public boolean cooldownReadyFlash = true;
     public int cooldownColor = ChatColors.DEFAULT;
 
+    // low fire
+    public boolean lowFire = false;
+    /** how far the screen fire is lowered, in hundredths of a block */
+    public int lowFireOffset = 35;
+
+    // chat heads
+    public boolean chatHeads = false;
+
+    // chest sorter
+    public boolean sorterOn = true;
+    public boolean sorterHotbar = false;
+
+    // weapon master (your hotbar items shown on your character)
+    public boolean wmOn = false;
+    public boolean wmSwords = true;
+    public boolean wmTools = true;
+    public boolean wmTrident = true;
+    public boolean wmBows = true;
+    public boolean wmShield = true;
+    public boolean wmBanner = true;
+    /** item size in percent */
+    public int wmScale = 100;
+
+    // map
+    public boolean mapOn = true;
+    public int mapSize = 110;
+    public int mapZoom = 2;
+    public boolean mapRotate = true;
+    public boolean mapPlayers = true;
+    public boolean mapMobs = false;
+    public boolean mapWaypoints = true;
+    public boolean mapCoords = true;
+    public boolean mapSave = true;
+    public boolean mapDeathPoint = true;
+    public boolean waypointLabels = true;
+
+    // map extras
+    /** auto-save waypoints shared by players on your friends list */
+    public boolean wpAutoAccept = false;
+    public List<String> friends = new ArrayList<>();
+    /** 0 = off, 1 = automatic (when you are underground), 2 = always */
+    public int mapCave = 0;
+
+    // entity radar
+    public boolean radarOn = false;
+    public int radarSize = 96;
+    public int radarRange = 32;
+    public boolean radarRotate = true;
+    public boolean radarPlayers = true;
+    public boolean radarHostile = true;
+    public boolean radarAnimals = false;
+    public boolean radarVillagers = false;
+    public boolean radarItems = false;
+    public boolean radarOther = false;
+    public boolean radarNames = true;
+    /** hide entities more than this many blocks above or below you */
+    public int radarHeight = 24;
+
+    // chat extras
+    public boolean chatTimestamps = false;
+    public boolean chatTime24h = true;
+    public boolean chatTimeSeconds = false;
+    public boolean chatMention = true;
+    public boolean chatMentionSound = true;
+    public boolean chatMentionHighlight = true;
+    public int chatMentionColor = 0xFFD54F;
+    /** 0 = xp orb, 1 = level up, 2 = chime */
+    public int chatMentionSoundChoice = 0;
+    /** extra words that count as a mention, separated by commas */
+    public String chatMentionWords = "";
+
+    // sorter extras
+    public boolean sorterButtons = true;
+    public boolean sorterAuto = false;
+    public boolean sorterAutoPlayer = false;
+
+    // cosmetics (capes and wings are textures; "local:file.png" is only visible to you)
+    public String capeId = "";
+    public String wingsId = "";
+    /** tell other players with the mod about your cape, wings and Weapon Master */
+    public boolean cosmeticsShare = true;
+    public boolean showOthersCosmetics = true;
+    public boolean wmShare = true;
+    public boolean wmShowOthers = true;
+
+    // clean screenshot: what hides and what stays
+    /** hide the whole vanilla HUD (hotbar, chat, crosshair ...); this also hides everything of ours */
+    public boolean shotHideVanillaHud = true;
+    public boolean shotHideModHud = true;
+    public boolean shotHideWaypoints = true;
+    public boolean shotHideBubbles = true;
+    public boolean shotHideDamage = true;
+    public boolean shotHideLight = true;
+    /** player name tags stay visible in the screenshot (the game normally hides them with the HUD) */
+    public boolean shotKeepNames = true;
+
+    // HUD elements you chose to hide (ids), and the villager trades hover panel
+    public List<String> hudHiddenIds = new ArrayList<>();
+    public boolean villagerHudOn = true;
+
+    // villager trade reroller
+    /** 0 = automatic (Trade Cycling mod if installed), 1 = Trade Cycling mod, 2 = break and replace the job block */
+    public int rerollMethod = 0;
+    /** GLFW key code of the Trade Cycling mod's cycle key (C by default) */
+    public int rerollCycleKey = 67;
+    public String rerollEnchant = "mending";
+    public int rerollMinLevel = 1;
+    public int rerollMaxCost = 64;
+    public int rerollMaxTries = 300;
+
     // GUI theme
     public int themePreset = 1;
     public int themeAccent = 0x35D0BA;
@@ -199,6 +311,7 @@ public final class ModConfig {
                     if (read.hudScale == null) {
                         read.hudScale = new HashMap<>();
                     }
+                    read.normalize();
                     return read;
                 }
             } catch (Exception e) {
@@ -206,6 +319,72 @@ public final class ModConfig {
             }
         }
         return new ModConfig();
+    }
+
+
+    /** Fixes up anything a hand-edited or older file left empty. */
+    private void normalize() {
+        if (positions == null) {
+            positions = new HashMap<>();
+        }
+        if (chatPlayers == null) {
+            chatPlayers = new HashMap<>();
+        }
+        if (hudScale == null) {
+            hudScale = new HashMap<>();
+        }
+        if (friends == null) {
+            friends = new ArrayList<>();
+        }
+        if (hudHiddenIds == null) {
+            hudHiddenIds = new ArrayList<>();
+        }
+        if (capeId == null) {
+            capeId = "";
+        }
+        if (wingsId == null) {
+            wingsId = "";
+        }
+        if (chatMentionWords == null) {
+            chatMentionWords = "";
+        }
+        if (rerollEnchant == null) {
+            rerollEnchant = "mending";
+        }
+    }
+
+    /** The whole config as JSON text (used by profiles). */
+    public String toJson() {
+        return GSON.toJson(this);
+    }
+
+    /** Parses JSON text made by toJson(); null if it is not a valid config. */
+    public static ModConfig fromJson(String json) {
+        try {
+            ModConfig read = GSON.fromJson(json, ModConfig.class);
+            if (read != null) {
+                read.normalize();
+            }
+            return read;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Replaces every setting with the values of another config (profiles). */
+    public void copyFrom(ModConfig other) {
+        for (java.lang.reflect.Field f : ModConfig.class.getDeclaredFields()) {
+            int mod = f.getModifiers();
+            if (java.lang.reflect.Modifier.isStatic(mod) || java.lang.reflect.Modifier.isFinal(mod)) {
+                continue;
+            }
+            try {
+                f.set(this, f.get(other));
+            } catch (IllegalAccessException e) {
+                SkinOverrideClient.LOGGER.warn("Could not copy setting {}", f.getName(), e);
+            }
+        }
+        normalize();
     }
 
     public void save() {

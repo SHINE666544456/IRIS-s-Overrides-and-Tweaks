@@ -15,7 +15,10 @@
     "CameraMixin",
     "EntityMixin",
     "EntityRendererMixin",
-    "OverlayTextureAccessor"
+    "OverlayTextureAccessor",
+    "InGameOverlayRendererMixin",
+    "HandledScreenAccessor",
+    "MinecraftClientMixin"
   ],
   "injectors": {
     "defaultRequire": 1

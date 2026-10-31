@@ -71,6 +71,11 @@ public final class PlayTime {
         }
     }
 
+    /** A stable id for the current world or server, used to file per-world data. */
+    public static String worldKey(MinecraftClient mc) {
+        return currentKey(mc);
+    }
+
     private static String currentKey(MinecraftClient mc) {
         if (mc.isInSingleplayer() && mc.getServer() != null) {
             return "world:" + mc.getServer().getSaveProperties().getLevelName();

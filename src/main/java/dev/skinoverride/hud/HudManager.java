@@ -1,5 +1,6 @@
 package dev.skinoverride.hud;
 
+import dev.skinoverride.CleanScreenshot;
 import dev.skinoverride.Crosshair;
 import dev.skinoverride.DamageNumbers;
 import dev.skinoverride.HotbarCooldowns;
@@ -7,6 +8,7 @@ import dev.skinoverride.LightOverlay;
 import dev.skinoverride.ModConfig;
 import dev.skinoverride.SkinOverrideClient;
 import dev.skinoverride.WorldLabels;
+import dev.skinoverride.map.WaypointLabels;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
@@ -24,6 +26,8 @@ public final class HudManager {
     public static final float MAX_SCALE = 3.0f;
 
     public static final List<HudWidget> WIDGETS = List.of(
+            new MinimapWidget(),
+            new RadarWidget(),
             new InfoWidget(),
             new ClockWidget(),
             new KeystrokesWidget(),
@@ -33,7 +37,31 @@ public final class HudManager {
             new EffectsWidget(),
             new InspectWidget(),
             new AfkWidget(),
-            new SubtitleWidget());
+            new SubtitleWidget(),
+            new VillagerTradesWidget());
+
+    /** Quick "hide all our HUD panels" switch (key); not saved. */
+    private static boolean allHidden;
+
+    public static boolean allHidden() {
+        return allHidden;
+    }
+
+    public static void toggleAll() {
+        allHidden = !allHidden;
+    }
+
+    public static boolean isHidden(HudWidget w) {
+        return ModConfig.get().hudHiddenIds.contains(w.id());
+    }
+
+    public static void setHidden(HudWidget w, boolean hidden) {
+        ModConfig cfg = ModConfig.get();
+        cfg.hudHiddenIds.remove(w.id());
+        if (hidden) {
+            cfg.hudHiddenIds.add(w.id());
+        }
+    }
 
     private HudManager() {
     }
@@ -76,8 +104,11 @@ public final class HudManager {
         }
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
+        ModConfig cfg = ModConfig.get();
+        boolean shot = CleanScreenshot.capturing();
+        boolean panelsHidden = allHidden || (shot && cfg.shotHideModHud);
         for (HudWidget w : WIDGETS) {
-            if (!w.enabled() || !w.visible(mc)) {
+            if (panelsHidden || isHidden(w) || !w.enabled() || !w.visible(mc)) {
                 continue;
             }
             w.prepare(mc, false);
@@ -87,10 +118,21 @@ public final class HudManager {
             int[] p = position(w, sw, sh, scaledWidth(w), scaledHeight(w));
             renderWidget(context, mc, w, p[0], p[1], false);
         }
-        LightOverlay.render(context, mc);
-        DamageNumbers.render(context, mc);
-        WorldLabels.render(context, mc);
-        HotbarCooldowns.render(context, mc);
+        if (!(shot && cfg.shotHideLight)) {
+            LightOverlay.render(context, mc);
+        }
+        if (!(shot && cfg.shotHideDamage)) {
+            DamageNumbers.render(context, mc);
+        }
+        if (!(shot && cfg.shotHideWaypoints)) {
+            WaypointLabels.render(context, mc);
+        }
+        if (!(shot && cfg.shotHideBubbles)) {
+            WorldLabels.render(context, mc);
+        }
+        if (!panelsHidden) {
+            HotbarCooldowns.render(context, mc);
+        }
     }
 
     // ---------- size ----------

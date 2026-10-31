@@ -2,6 +2,9 @@ package dev.skinoverride;
 
 import dev.skinoverride.chat.ChatColors;
 import dev.skinoverride.chat.Emotes;
+import dev.skinoverride.hud.HudManager;
+import dev.skinoverride.hud.HudWidget;
+import dev.skinoverride.map.MapData;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -54,8 +57,10 @@ public class SettingsScreen extends ThemedScreen {
     private record ArmorGrid() implements Row {
     }
 
-    private static final String[] TABS = {"HUD", "Info", "Inspect", "AFK", "Chat", "Visuals", "Combat", "Theme"};
-    private static final int TAB_STEP = 18;
+    private static final String[] TABS = {"HUD", "Info", "Players", "Chat", "Visuals", "Combat", "Map", "Tools", "Theme", "Profiles", "Cosmetics"};
+    private static final int TAB_STEP = 16;
+    /** which rows() branch each tab uses */
+    private static final int[] TAB_CASE = {0, 1, 2, 4, 5, 6, 8, 9, 10, 11, 12};
     private static final int TAB_W = 78;
     private static final int SLIDER_W = 100;
 
@@ -101,7 +106,7 @@ public class SettingsScreen extends ThemedScreen {
 
     private List<Row> rows() {
         List<Row> r = new ArrayList<>();
-        switch (tab) {
+        switch (TAB_CASE[tab]) {
             case 0 -> {
                 r.add(new Header("Armor & held items"));
                 r.add(new Toggle("Show armor HUD", "Your armor and held items. Drag it anywhere.",
@@ -148,6 +153,14 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Toggle("Only my listed players", "Only players with custom colors (Chat > Per-player).",
                         () -> cfg.notifyOnlyListed, v -> cfg.notifyOnlyListed = v));
                 r.add(new Note("Every HUD element can be moved and resized: Edit HUD layout (below)."));
+                r.add(new Header("Shown HUD elements"));
+                for (HudWidget hw : HudManager.WIDGETS) {
+                    r.add(new Toggle(hw.label(), "Off = hidden, but its settings are kept.",
+                            () -> !HudManager.isHidden(hw), v -> HudManager.setHidden(hw, !v)));
+                }
+                r.add(new Toggle("Villager trades panel", "Point at a villager to see its enchanted book trades.",
+                        () -> cfg.villagerHudOn, v -> cfg.villagerHudOn = v));
+                r.add(new Note("A key (Controls: \"Hide / show all IRIS HUD panels\") hides them all at once."));
             }
             case 1 -> {
                 r.add(new Header("Coordinates & FPS"));
@@ -193,8 +206,6 @@ public class SettingsScreen extends ThemedScreen {
                         v -> v + " blocks", () -> cfg.inspectRange, v -> cfg.inspectRange = v));
                 r.add(new Note("Only players you can see are shown, and only held/worn items:"));
                 r.add(new Note("servers never send other players' inventories to your client."));
-            }
-            case 3 -> {
                 r.add(new Header("AFK detection"));
                 r.add(new Toggle("Enable AFK detection", "Watches nearby players for movement.",
                         () -> cfg.afkTracking, v -> cfg.afkTracking = v));
@@ -228,6 +239,10 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.chatDeathColor, v -> cfg.chatDeathColor = v));
                 r.add(new Note("Rainbow colors every letter. Color cycle gives each new message"));
                 r.add(new Note("a different color. Colors are fixed once a message arrives."));
+                r.add(new Header("Chat heads"));
+                r.add(new Toggle("Player heads in chat", "A small face in front of each player's message.",
+                        () -> cfg.chatHeads, v -> cfg.chatHeads = v));
+                r.add(new Note("Uses the game's built-in player heads, so they show the real skin."));
                 r.add(new Header("Emotes"));
                 r.add(new Toggle("Emotes", "Show :smile: :heart: ... as pixel emotes.",
                         () -> cfg.chatEmotes, v -> cfg.chatEmotes = v));
@@ -248,6 +263,32 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Toggle("Read chat aloud", "Uses Minecraft's built-in narrator.",
                         () -> cfg.chatTts, Tts::set));
                 r.add(new Note("The voice and speed come from your operating system."));
+                r.add(new Header("Timestamps"));
+                r.add(new Toggle("Timestamps", "A small grey [12:34] in front of every chat line.",
+                        () -> cfg.chatTimestamps, v -> cfg.chatTimestamps = v));
+                r.add(new Toggle("24-hour time", "Off = 12-hour with AM / PM.",
+                        () -> cfg.chatTime24h, v -> cfg.chatTime24h = v));
+                r.add(new Toggle("Show seconds", "[12:34:56] instead of [12:34].",
+                        () -> cfg.chatTimeSeconds, v -> cfg.chatTimeSeconds = v));
+                r.add(new Header("Name mentions"));
+                r.add(new Toggle("Notice my name", "When someone else says your name in chat.",
+                        () -> cfg.chatMention, v -> cfg.chatMention = v));
+                r.add(new Toggle("Play a sound", "A short sound for each mention.",
+                        () -> cfg.chatMentionSound, v -> cfg.chatMentionSound = v));
+                r.add(new Cycle("Sound", "Which sound to play.", new String[]{"XP orb", "Level up", "Chime"},
+                        () -> cfg.chatMentionSoundChoice, v -> {
+                            cfg.chatMentionSoundChoice = v;
+                            dev.skinoverride.chat.ChatExtras.playSound(this.client, cfg);
+                        }));
+                r.add(new Toggle("Highlight the message", "Colors the whole line so you spot it.",
+                        () -> cfg.chatMentionHighlight, v -> cfg.chatMentionHighlight = v));
+                r.add(new ColorRow("Highlight color", "Color of a message that mentions you.",
+                        () -> cfg.chatMentionColor, v -> cfg.chatMentionColor = v, true));
+                r.add(new Note("More words (a nickname...): chatMentionWords in config/skinoverride/settings.json,"));
+                r.add(new Note("separated by commas."));
+                r.add(new Header("Search"));
+                r.add(new Action("Search chat", "Find anything said this session. Click a line to copy it.", "Open",
+                        () -> this.client.setScreen(new ChatSearchScreen(this))));
             }
             case 5 -> {
                 r.add(new Header("World"));
@@ -291,12 +332,33 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.nametagDefaultColor, v -> cfg.nametagDefaultColor = v));
                 r.add(new Action("Per-player nametags", "Pick a nametag color for specific players.", "Open",
                         () -> this.client.setScreen(new ChatPlayersScreen(this))));
+                r.add(new Header("Screen effects"));
+                r.add(new Toggle("Low fire", "Flames only cover the bottom of your screen when you burn.",
+                        () -> cfg.lowFire, v -> cfg.lowFire = v));
+                r.add(new Slider("Fire height", "How far the flames are lowered.", 10, 60, 5,
+                        v -> String.format(java.util.Locale.ROOT, "%.2f", v / 100.0),
+                        () -> cfg.lowFireOffset, v -> cfg.lowFireOffset = v));
                 r.add(new Header("Screenshots"));
                 r.add(new Action("Clean screenshot", "Hides the HUD; player name tags stay. Key: F9.", "Take now",
                         () -> {
                             this.client.setScreen(null);
                             CleanScreenshot.request(this.client);
                         }));
+                r.add(new Note("What the clean screenshot hides (name tags always stay when kept):"));
+                r.add(new Toggle("Hide the game HUD", "Hotbar, chat, crosshair ... (F1 style). Also hides all IRIS panels.",
+                        () -> cfg.shotHideVanillaHud, v -> cfg.shotHideVanillaHud = v));
+                r.add(new Toggle("Hide IRIS HUD panels", "Our panels (when the game HUD stays on).",
+                        () -> cfg.shotHideModHud, v -> cfg.shotHideModHud = v));
+                r.add(new Toggle("Hide waypoint labels", "The floating waypoint names.",
+                        () -> cfg.shotHideWaypoints, v -> cfg.shotHideWaypoints = v));
+                r.add(new Toggle("Hide chat bubbles", "Speech bubbles above players.",
+                        () -> cfg.shotHideBubbles, v -> cfg.shotHideBubbles = v));
+                r.add(new Toggle("Hide damage numbers", "Floating damage numbers.",
+                        () -> cfg.shotHideDamage, v -> cfg.shotHideDamage = v));
+                r.add(new Toggle("Hide light overlay", "The colored light-level squares.",
+                        () -> cfg.shotHideLight, v -> cfg.shotHideLight = v));
+                r.add(new Toggle("Keep player name tags", "The game hides name tags with the HUD; this keeps them.",
+                        () -> cfg.shotKeepNames, v -> cfg.shotKeepNames = v));
                 r.add(new Note("Keys can be changed under Options > Controls (search \"IRIS\")."));
             }
             case 6 -> {
@@ -352,6 +414,166 @@ public class SettingsScreen extends ThemedScreen {
                         () -> cfg.cooldownColor, v -> cfg.cooldownColor = v));
                 r.add(new Note("Only your own screen changes: other players see nothing different."));
             }
+            case 8 -> {
+                r.add(new Header("Minimap"));
+                r.add(new Toggle("Map", "Minimap, full map (M) and waypoints.",
+                        () -> cfg.mapOn, v -> cfg.mapOn = v));
+                r.add(new Slider("Minimap size", "Width and height on the screen.", 70, 200, 10,
+                        v -> v + " px", () -> cfg.mapSize, v -> cfg.mapSize = v));
+                r.add(new Slider("Zoom", "1 = wide view, 4 = close up. Keys: [ and ].", 1, 4, 1,
+                        v -> v + "/4", () -> cfg.mapZoom, v -> cfg.mapZoom = v));
+                r.add(new Toggle("Rotate with you", "Off = north is always up.",
+                        () -> cfg.mapRotate, v -> cfg.mapRotate = v));
+                r.add(new Toggle("Show players", "White dots for other players.",
+                        () -> cfg.mapPlayers, v -> cfg.mapPlayers = v));
+                r.add(new Toggle("Show mobs", "Red = hostile, green = others.",
+                        () -> cfg.mapMobs, v -> cfg.mapMobs = v));
+                r.add(new Cycle("Cave mode", "Shows the cave around your height. Auto = when underground.",
+                        new String[]{"Off", "Auto", "Always"}, () -> cfg.mapCave, v -> cfg.mapCave = v));
+                r.add(new Toggle("Coordinates", "Your position under the minimap.",
+                        () -> cfg.mapCoords, v -> cfg.mapCoords = v));
+                r.add(new Header("Waypoints & full map"));
+                r.add(new Action("Open full map", "Pan, zoom and add waypoints. Key: M.", "Open",
+                        () -> this.client.setScreen(new WorldMapScreen(this))));
+                r.add(new Toggle("Waypoints on the minimap", "Colored squares.",
+                        () -> cfg.mapWaypoints, v -> cfg.mapWaypoints = v));
+                r.add(new Toggle("Waypoint labels in the world", "Name and distance where the waypoint is.",
+                        () -> cfg.waypointLabels, v -> cfg.waypointLabels = v));
+                r.add(new Toggle("Death point", "Automatically marks where you died.",
+                        () -> cfg.mapDeathPoint, v -> cfg.mapDeathPoint = v));
+                r.add(new Action("Share waypoints", "Friends list, inbox, and sending waypoints.", "Open",
+                        () -> this.client.setScreen(new WaypointSharingScreen(this))));
+                r.add(new Header("Entity radar"));
+                r.add(new Toggle("Entity radar", "A movable scope with nearby entities.",
+                        () -> cfg.radarOn, v -> cfg.radarOn = v));
+                r.add(new Slider("Radar size", "Width and height on the screen.", 60, 160, 10,
+                        v -> v + " px", () -> cfg.radarSize, v -> cfg.radarSize = v));
+                r.add(new Slider("Radar range", "How far it sees.", 8, 96, 4,
+                        v -> v + " blocks", () -> cfg.radarRange, v -> cfg.radarRange = v));
+                r.add(new Slider("Height limit", "Hide things this far above or below you.", 4, 64, 4,
+                        v -> v + " blocks", () -> cfg.radarHeight, v -> cfg.radarHeight = v));
+                r.add(new Toggle("Rotate with you", "Off = north is always up.",
+                        () -> cfg.radarRotate, v -> cfg.radarRotate = v));
+                r.add(new Toggle("Players", "White dots, with names.",
+                        () -> cfg.radarPlayers, v -> cfg.radarPlayers = v));
+                r.add(new Toggle("Hostile mobs", "Red dots.",
+                        () -> cfg.radarHostile, v -> cfg.radarHostile = v));
+                r.add(new Toggle("Animals", "Green dots.",
+                        () -> cfg.radarAnimals, v -> cfg.radarAnimals = v));
+                r.add(new Toggle("Villagers and traders", "Yellow dots.",
+                        () -> cfg.radarVillagers, v -> cfg.radarVillagers = v));
+                r.add(new Toggle("Dropped items", "Blue dots.",
+                        () -> cfg.radarItems, v -> cfg.radarItems = v));
+                r.add(new Toggle("Other mobs", "Purple dots: golems, bats, fish...",
+                        () -> cfg.radarOther, v -> cfg.radarOther = v));
+                r.add(new Toggle("Player names", "Names under player dots.",
+                        () -> cfg.radarNames, v -> cfg.radarNames = v));
+                r.add(new Note("A small arrow marks things more than 4 blocks above or below you."));
+                r.add(new Header("Memory"));
+                r.add(new Toggle("Remember explored areas", "Saved per world / server on your computer.",
+                        () -> cfg.mapSave, v -> cfg.mapSave = v));
+                r.add(new Action("Clear this world's map", "Forget everything explored here.", "Clear",
+                        MapData::clearCurrent));
+                r.add(new Note("Keys: M full map, V add a waypoint here, [ and ] minimap zoom."));
+                r.add(new Note("The map is drawn from chunks your game has loaded."));
+            }
+            case 9 -> {
+                r.add(new Header("Emote wheel & armor"));
+                if (EmoteBridge.available()) {
+                    r.add(new Action("Emote menu", "Library, wheel editor and live preview. Key: N.", "Open",
+                            () -> openScreen(EmoteBridge.menu(this))));
+                    r.add(new Action("Emote wheel settings", "Cat ears, tail, pet, particles and more.", "Open",
+                            () -> openScreen(EmoteBridge.settings(this))));
+                    r.add(new Note("Hold B for the wheel. Rename armor in an anvil: Hinata or maid."));
+                    r.add(new Note("Rebind under Controls > Key Binds > Emote Wheel."));
+                } else {
+                    r.add(new Note("The Emote Wheel part of this mod is missing from the jar."));
+                }
+                r.add(new Header("Chest sorter"));
+                r.add(new Toggle("Sort with a key", "Press R over a chest, barrel, shulker, hopper or inventory.",
+                        () -> cfg.sorterOn, v -> cfg.sorterOn = v));
+                r.add(new Toggle("Include hotbar", "When sorting your own inventory.",
+                        () -> cfg.sorterHotbar, v -> cfg.sorterHotbar = v));
+                r.add(new Note("Sorts by item ID after merging stacks. Rebind the key under Controls."));
+                r.add(new Toggle("Buttons on the screen", "Sort / Stash / Same / My inv above chests and inventory.",
+                        () -> cfg.sorterButtons, v -> cfg.sorterButtons = v));
+                r.add(new Toggle("Sort chests when opened", "Sorts the container automatically.",
+                        () -> cfg.sorterAuto, v -> cfg.sorterAuto = v));
+                r.add(new Toggle("Sort my inventory when opened", "Also sorts yours (with any chest or alone).",
+                        () -> cfg.sorterAutoPlayer, v -> cfg.sorterAutoPlayer = v));
+                r.add(new Note("Stash = move all your items into the chest. Same = only kinds it already holds."));
+                r.add(new Header("Armor looks"));
+                r.add(new Action("Armor options", "Maid / Hinata textures on or off, and show or hide armor.", "Open",
+                        () -> {
+                            net.minecraft.client.gui.screen.Screen s = EmoteBridge.settings(this);
+                            if (s != null) {
+                                this.client.setScreen(s);
+                            }
+                        }));
+                r.add(new Note("Emote settings: Maid armor texture, Hinata armor texture, and Armor visibility."));
+                r.add(new Header("Weapon Master"));
+                r.add(new Toggle("Show hotbar items on my character", "Weapons and tools appear on your body.",
+                        () -> cfg.wmOn, v -> cfg.wmOn = v));
+                r.add(new Toggle("Swords", "On your hips.",
+                        () -> cfg.wmSwords, v -> cfg.wmSwords = v));
+                r.add(new Toggle("Axes, pickaxes, shovels, hoes, maces", "Crossed on your back.",
+                        () -> cfg.wmTools, v -> cfg.wmTools = v));
+                r.add(new Toggle("Trident", "On your back.",
+                        () -> cfg.wmTrident, v -> cfg.wmTrident = v));
+                r.add(new Toggle("Bows and crossbows", "On your back.",
+                        () -> cfg.wmBows, v -> cfg.wmBows = v));
+                r.add(new Toggle("Shield", "Flat on your back.",
+                        () -> cfg.wmShield, v -> cfg.wmShield = v));
+                r.add(new Toggle("Banner", "Low on your back.",
+                        () -> cfg.wmBanner, v -> cfg.wmBanner = v));
+                r.add(new Slider("Item size", "Scale of the displayed items.", 50, 150, 10,
+                        v -> v + "%", () -> cfg.wmScale, v -> cfg.wmScale = v));
+                r.add(new Toggle("Share with other players", "Players with the mod (and a server with it) see yours.",
+                        () -> cfg.wmShare, v -> cfg.wmShare = v));
+                r.add(new Toggle("Show other players' weapons", "Draw the loadouts they share.",
+                        () -> cfg.wmShowOthers, v -> cfg.wmShowOthers = v));
+                r.add(new Note("You see it in third person or freecam. Sharing needs the mod on the server."));
+                r.add(new Header("Villager trade reroller"));
+                r.add(new Action("Reroll for an enchantment", "Pick an enchant, min level and max price, then start.", "Open",
+                        () -> this.client.setScreen(new RerollScreen(this))));
+                r.add(new Note("Break and replace the job block until the trade shows up. Check server rules first."));
+            }
+            case 11 -> {
+                r.add(new Header("Settings profiles"));
+                r.add(new Action("Profiles", "Save, load and delete whole sets of settings.", "Open",
+                        () -> this.client.setScreen(new ProfilesScreen(this))));
+                r.add(new Note("A profile stores every setting in this mod, HUD layout included."));
+                r.add(new Note("In the profile screen you can link a profile to a server or world: it switches"));
+                r.add(new Note("on when you join and your normal settings come back when you leave."));
+                String active = Profiles.activeServerProfile();
+                if (active != null) {
+                    r.add(new Note("Active server profile: " + active));
+                }
+            }
+            case 12 -> {
+                r.add(new Header("Cape and wings"));
+                r.add(new Cycle("Cape", "Built-in capes, plus your own PNGs.",
+                        Cosmetics.labels(true), () -> Cosmetics.indexOf(true, cfg.capeId),
+                        v -> cfg.capeId = Cosmetics.idAt(true, v)));
+                r.add(new Cycle("Wings", "Re-textures your elytra (shown while you wear one).",
+                        Cosmetics.labels(false), () -> Cosmetics.indexOf(false, cfg.wingsId),
+                        v -> cfg.wingsId = Cosmetics.idAt(false, v)));
+                r.add(new Note("Your own PNGs (64x32): config/skinoverride/capes and /wings. Only you see those."));
+                r.add(new Header("Seeing each other"));
+                r.add(new Toggle("Share my look", "Tell players with the mod about your built-in cape and wings.",
+                        () -> cfg.cosmeticsShare, v -> cfg.cosmeticsShare = v));
+                r.add(new Toggle("Show other players' capes and wings", "The ones they share.",
+                        () -> cfg.showOthersCosmetics, v -> cfg.showOthersCosmetics = v));
+                r.add(new Note("Sharing needs this mod on the server too. Without it only you see your cosmetics."));
+                r.add(new Header("Weapon Master"));
+                r.add(new Toggle("Show hotbar items on my character", "Weapons and tools appear on your body.",
+                        () -> cfg.wmOn, v -> cfg.wmOn = v));
+                r.add(new Toggle("Share with other players", "They see your weapons too.",
+                        () -> cfg.wmShare, v -> cfg.wmShare = v));
+                r.add(new Toggle("Show other players' weapons", "Draw the loadouts they share.",
+                        () -> cfg.wmShowOthers, v -> cfg.wmShowOthers = v));
+                r.add(new Note("More Weapon Master options are in the Tools tab."));
+            }
             default -> {
                 r.add(new Header("GUI colors"));
                 r.add(new Cycle("Preset", "Quick color schemes for every IRIS menu and HUD box.",
@@ -372,6 +594,12 @@ public class SettingsScreen extends ThemedScreen {
             }
         }
         return r;
+    }
+
+    private void openScreen(net.minecraft.client.gui.screen.Screen screen) {
+        if (screen != null) {
+            this.client.setScreen(screen);
+        }
     }
 
     private static int rowHeight(Row row) {
@@ -431,9 +659,9 @@ public class SettingsScreen extends ThemedScreen {
         for (int i = 0; i < TABS.length; i++) {
             int ty = py + 22 + i * TAB_STEP;
             boolean sel = i == tab;
-            boolean hov = Ui.inside(mouseX, mouseY, px + 4, ty, TAB_W, 16);
-            Ui.roundRect(c, px + 4, ty, TAB_W, 16, sel ? Ui.ACCENT_FILL : hov ? Ui.BG_HOVER : Ui.BG_LIGHT);
-            Ui.roundBorder(c, px + 4, ty, TAB_W, 16, sel ? Ui.ACCENT : Ui.BORDER);
+            boolean hov = Ui.inside(mouseX, mouseY, px + 4, ty, TAB_W, 15);
+            Ui.roundRect(c, px + 4, ty, TAB_W, 15, sel ? Ui.ACCENT_FILL : hov ? Ui.BG_HOVER : Ui.BG_LIGHT);
+            Ui.roundBorder(c, px + 4, ty, TAB_W, 15, sel ? Ui.ACCENT : Ui.BORDER);
             Ui.text(c, this.textRenderer, TABS[i], px + 12, ty + 4, sel ? 0xFFFFFFFF : Ui.TEXT);
         }
 
@@ -565,7 +793,7 @@ public class SettingsScreen extends ThemedScreen {
         }
 
         for (int i = 0; i < TABS.length; i++) {
-            if (Ui.inside(mx, my, px + 4, py + 22 + i * TAB_STEP, TAB_W, 16)) {
+            if (Ui.inside(mx, my, px + 4, py + 22 + i * TAB_STEP, TAB_W, 15)) {
                 if (tab != i) {
                     tab = i;
                     scroll = 0;
