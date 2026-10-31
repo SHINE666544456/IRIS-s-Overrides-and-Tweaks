@@ -1,6 +1,5 @@
 plugins {
 	id 'fabric-loom' version "${loom_version}"
-	id 'maven-publish'
 }
 
 version = project.mod_version
@@ -17,9 +16,27 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
+// The emote wheel + armor mod is built as its own subproject (it uses Mojang names, this mod uses Yarn
+// names) and nested inside the final jar, so you still get ONE jar to install.
+configurations {
+	nestedJars {
+		transitive = false
+	}
+}
+
+dependencies {
+	nestedJars project(':emote-wheel')
+}
+
+remapJar {
+	nestedJars.from configurations.nestedJars
+}
+
 processResources {
 	def modVersion = project.version
+	def emoteVersion = project.emote_wheel_version
 	inputs.property "version", modVersion
+	inputs.property "emoteVersion", emoteVersion
 
 	filesMatching("fabric.mod.json") {
 		expand "version": modVersion

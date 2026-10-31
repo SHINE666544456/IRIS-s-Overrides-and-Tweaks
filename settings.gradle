@@ -9,4 +9,7 @@ pluginManagement {
 	}
 }
 
-rootProject.name = 'iris-overrides-and-tweaks'
+rootProject.name = 'iris-overrides-tweaks-emote-wheel-and-armor'
+
+// the emote wheel + armor mod
+include 'emote-wheel'
