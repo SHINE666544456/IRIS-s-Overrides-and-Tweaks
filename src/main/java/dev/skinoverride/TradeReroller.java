@@ -122,7 +122,14 @@ public final class TradeReroller {
                 mc.inGameHud.setOverlayMessage(Text.literal(error), false);
             }
         }).dimensions(x0, y, 62, 14).build());
-        widgets.add(ButtonWidget.builder(Text.literal("Setup"), b -> mc.setScreen(new RerollScreen(null)))
+        widgets.add(ButtonWidget.builder(Text.literal("Setup"), b -> {
+            // close the trade window properly first (this tells the server), otherwise it still thinks you are
+            // trading and will not let you talk to this villager again
+            if (mc.player != null) {
+                mc.player.closeHandledScreen();
+            }
+            mc.setScreen(new RerollScreen(null));
+        })
                 .dimensions(x0 + 64, y, 44, 14).build());
     }
 
