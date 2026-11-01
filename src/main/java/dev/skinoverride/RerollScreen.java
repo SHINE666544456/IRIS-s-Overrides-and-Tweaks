@@ -4,7 +4,6 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
@@ -13,21 +12,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Pick the enchantment, minimum level and maximum price for the villager trade reroller, then start it. */
+/**
+ * Trade reroller setup as a wishlist: click enchantments on the left to add them, set the lowest level and the
+ * highest price you accept for each on the right, then Start. The reroller stops at the first trade that fits any
+ * entry. Each enchantment shows its highest level and the cheapest price it can ever have.
+ */
 public class RerollScreen extends ThemedScreen {
 
-    private static final int ROW_H = 13;
+    private static final int ROW_H = 14;
+    private static final int WISH_H = 40;
 
     private final Screen parent;
     private final ModConfig cfg = ModConfig.get();
-    private final List<String> all = TradeReroller.knownEnchants();
+    private final List<String> all = EnchantInfo.ids();
     private List<String> shown = new ArrayList<>();
     private TextFieldWidget search;
-    private double scroll;
+    private double scrollL;
+    private double scrollR;
     private String message = "";
     private long messageUntil;
 
-    private int px, py, pw, ph, listW, listTop, listBottom, rx;
+    private int px, py, pw, ph, listW, listTop, listBottom, rx, rw, wishTop, wishBottom;
 
     public RerollScreen(Screen parent) {
         super(Text.literal("Trade reroller"));
@@ -47,20 +52,31 @@ public class RerollScreen extends ThemedScreen {
                 shown.add(id);
             }
         }
-        scroll = 0;
+        scrollL = 0;
+    }
+
+    private ModConfig.Wish wishFor(String id) {
+        for (ModConfig.Wish w : cfg.rerollWishes) {
+            if (w.enchant.equals(id)) {
+                return w;
+            }
+        }
+        return null;
     }
 
     @Override
     protected void build() {
-        pw = Math.min(this.width - 20, 440);
+        pw = Math.min(this.width - 20, 540);
         ph = this.height - 24 - 34;
         px = (this.width - pw) / 2;
         py = 24;
-        listW = 150;
+        listW = 190;
         listTop = py + 44;
         listBottom = py + ph - 4;
         rx = px + listW + 14;
-        int rw = px + pw - 8 - rx;
+        rw = px + pw - 8 - rx;
+        wishTop = py + 34;
+        wishBottom = py + ph - 52;
 
         this.search = new TextFieldWidget(this.textRenderer, px + 4, py + 22, listW, 16, Text.literal("Search enchantments"));
         this.search.setPlaceholder(Text.literal("Search enchantment...").formatted(Formatting.DARK_GRAY));
@@ -69,58 +85,33 @@ public class RerollScreen extends ThemedScreen {
         this.addDrawableChild(this.search);
         filter();
 
-        int y = py + 58;
+        String[] methods = {"Auto", "Trade Cycling button", "Break job block"};
         int half = (rw - 4) / 2;
-        button(rx, y, half, 16, () -> "Min level: " + cfg.rerollMinLevel, () -> true, false, () -> {
-            cfg.rerollMinLevel = cfg.rerollMinLevel % 5 + 1;
-            cfg.save();
-        });
-        button(rx + half + 4, y, half, 16, () -> "Max tries: " + cfg.rerollMaxTries, () -> true, false, () -> {
+        button(rx, py + ph - 46, half, 18, () -> "Method: " + methods[MathHelper.clamp(cfg.rerollMethod, 0, 2)],
+                () -> true, false, () -> {
+                    cfg.rerollMethod = (cfg.rerollMethod + 1) % 3;
+                    cfg.save();
+                });
+        button(rx + half + 4, py + ph - 46, half, 18, () -> "Max tries: " + cfg.rerollMaxTries, () -> true, false, () -> {
             int[] steps = {50, 100, 300, 600, 1000};
             int next = steps[0];
-            for (int i = 0; i < steps.length; i++) {
-                if (steps[i] > cfg.rerollMaxTries) {
-                    next = steps[i];
+            for (int step : steps) {
+                if (step > cfg.rerollMaxTries) {
+                    next = step;
                     break;
                 }
             }
             cfg.rerollMaxTries = next;
             cfg.save();
         });
-
-        String[] methods = {"Auto", "Trade Cycling mod", "Break job block"};
-        button(rx, py + 78, rw, 16, () -> "Method: " + methods[MathHelper.clamp(cfg.rerollMethod, 0, 2)],
-                () -> true, false, () -> {
-                    cfg.rerollMethod = (cfg.rerollMethod + 1) % 3;
-                    cfg.save();
-                });
-        button(rx, py + 98, rw, 16, () -> "Trade Cycling key: " + (char) cfg.rerollCycleKey,
-                () -> cfg.rerollMethod != 2, false, () -> {
-                    int next = cfg.rerollCycleKey + 1;
-                    cfg.rerollCycleKey = next > 90 || next < 65 ? 65 : next;
-                    cfg.save();
-                });
-
-        int cy = py + 134;
-        int bw = Math.max(26, (rw - 4 * 3) / 5);
-        int[] deltas = {-8, -1, 1, 8};
-        int bx = rx;
-        for (int d : deltas) {
-            int delta = d;
-            button(bx, cy, bw, 16, () -> (delta > 0 ? "+" : "") + delta, () -> true, false, () -> {
-                cfg.rerollMaxCost = MathHelper.clamp(cfg.rerollMaxCost + delta, 1, 64);
-                cfg.save();
-            });
-            bx += bw + 3;
-        }
-
-        button(rx, py + 158, rw, 20,
+        button(rx, py + ph - 24, rw, 20,
                 () -> TradeReroller.active() ? "Stop rerolling" : "Start rerolling", () -> true, true, () -> {
                     if (TradeReroller.active()) {
                         TradeReroller.stop(this.client, "Reroll stopped");
                         say("Stopped");
                         return;
                     }
+                    cfg.save();
                     String error = TradeReroller.start(this.client, null);
                     if (error != null) {
                         say(error);
@@ -129,12 +120,15 @@ public class RerollScreen extends ThemedScreen {
                     }
                 });
 
-        int by = this.height - 28;
-        button(px + (pw - 110) / 2, by, 110, 20, "Done", false, this::close);
+        button(px + (pw - 110) / 2, this.height - 28, 110, 20, "Done", false, this::close);
     }
 
-    private double maxScroll() {
+    private double maxScrollL() {
         return Math.max(0, shown.size() * ROW_H + 4 - (listBottom - listTop));
+    }
+
+    private double maxScrollR() {
+        return Math.max(0, cfg.rerollWishes.size() * WISH_H + 4 - (wishBottom - wishTop));
     }
 
     @Override
@@ -142,50 +136,92 @@ public class RerollScreen extends ThemedScreen {
         Ui.panel(c, px, py, pw, ph);
         Ui.header(c, this.textRenderer, "Villager trade reroller", px + 1, py + 1, pw - 2);
         Ui.panel(c, px + 4, listTop, listW, listBottom - listTop);
+        Ui.panel(c, rx, wishTop, rw, wishBottom - wishTop);
         super.render(c, mouseX, mouseY, delta);
 
-        scroll = MathHelper.clamp(scroll, 0.0, maxScroll());
+        // ---- enchantment list ----
+        scrollL = MathHelper.clamp(scrollL, 0.0, maxScrollL());
         c.enableScissor(px + 5, listTop + 1, px + 3 + listW, listBottom - 1);
-        String want = cfg.rerollEnchant == null ? "" : cfg.rerollEnchant.replace("minecraft:", "");
         for (int i = 0; i < shown.size(); i++) {
-            int y = listTop + 3 + i * ROW_H - (int) scroll;
+            int y = listTop + 3 + i * ROW_H - (int) scrollL;
             if (y + ROW_H < listTop || y > listBottom) {
                 continue;
             }
             String id = shown.get(i);
-            boolean sel = id.equals(want);
+            boolean wished = wishFor(id) != null;
             boolean hov = Ui.inside(mouseX, mouseY, px + 4, y, listW, ROW_H) && mouseY >= listTop && mouseY < listBottom;
-            if (sel) {
-                Ui.roundRect(c, px + 7, y, listW - 6, ROW_H, Ui.withAlpha(Ui.ACCENT, 0x80));
+            if (wished) {
+                Ui.roundRect(c, px + 7, y, listW - 6, ROW_H, Ui.withAlpha(Ui.ACCENT, 0x70));
             } else if (hov) {
                 Ui.roundRect(c, px + 7, y, listW - 6, ROW_H, 0x40FFFFFF);
             }
-            Ui.text(c, this.textRenderer, TradeReroller.pretty(id), px + 11, y + 3, Ui.TEXT);
+            Ui.text(c, this.textRenderer, EnchantInfo.pretty(id), px + 11, y + 3, Ui.TEXT);
+            String info = "max " + EnchantInfo.roman(EnchantInfo.maxLevel(id)) + " | from " + EnchantInfo.minPrice(id, 1);
+            Ui.text(c, this.textRenderer, info, px + 3 + listW - 6 - this.textRenderer.getWidth(info), y + 3,
+                    EnchantInfo.treasure(id) ? Ui.WARN : Ui.MUTED);
+        }
+        c.disableScissor();
+        Ui.text(c, this.textRenderer, "Click to add or remove. Orange = treasure (double price).", px + 4, listBottom + 1 - 0, Ui.MUTED);
+
+        // ---- wishlist ----
+        Ui.text(c, this.textRenderer, "Wishlist: stops at the first match", rx, py + 24, Ui.MUTED);
+        scrollR = MathHelper.clamp(scrollR, 0.0, maxScrollR());
+        c.enableScissor(rx + 1, wishTop + 1, rx + rw - 1, wishBottom - 1);
+        if (cfg.rerollWishes.isEmpty()) {
+            Ui.text(c, this.textRenderer, "Empty. Click enchantments on the left.", rx + 8, wishTop + 10, Ui.MUTED);
+        }
+        for (int i = 0; i < cfg.rerollWishes.size(); i++) {
+            ModConfig.Wish w = cfg.rerollWishes.get(i);
+            int y = wishTop + 3 + i * WISH_H - (int) scrollR;
+            if (y + WISH_H < wishTop || y > wishBottom) {
+                continue;
+            }
+            int x0 = rx + 6;
+            int max = EnchantInfo.maxLevel(w.enchant);
+            Ui.card(c, rx + 3, y, rw - 6, WISH_H - 3, Ui.BORDER);
+            Ui.text(c, this.textRenderer, EnchantInfo.pretty(w.enchant) + "  (max " + EnchantInfo.roman(max) + ")", x0, y + 4, Ui.ACCENT);
+            smallButton(c, mouseX, mouseY, rx + rw - 20, y + 2, 14, "x");
+
+            int ly = y + 16;
+            Ui.text(c, this.textRenderer, "Level", x0, ly + 2, Ui.MUTED);
+            smallButton(c, mouseX, mouseY, x0 + 32, ly, 12, "-");
+            Ui.text(c, this.textRenderer, EnchantInfo.roman(w.minLevel) + "+", x0 + 47, ly + 2, Ui.TEXT);
+            smallButton(c, mouseX, mouseY, x0 + 66, ly, 12, "+");
+
+            int cx = x0 + 92;
+            Ui.text(c, this.textRenderer, "Max price", cx, ly + 2, Ui.MUTED);
+            smallButton(c, mouseX, mouseY, cx + 46, ly, 18, "-8");
+            smallButton(c, mouseX, mouseY, cx + 66, ly, 14, "-1");
+            Ui.text(c, this.textRenderer, String.valueOf(w.maxCost), cx + 83, ly + 2, Ui.TEXT);
+            smallButton(c, mouseX, mouseY, cx + 100, ly, 14, "+1");
+            smallButton(c, mouseX, mouseY, cx + 116, ly, 18, "+8");
+
+            int lo = EnchantInfo.minPrice(w.enchant, w.minLevel);
+            int hi = EnchantInfo.maxPrice(w.enchant, w.minLevel);
+            boolean impossible = w.maxCost < lo;
+            String hint = impossible
+                    ? "Cheapest possible at this level is " + lo + ": it will never match."
+                    : "At this level the price is " + lo + " to " + hi + " emeralds.";
+            Ui.text(c, this.textRenderer, this.textRenderer.trimToWidth(hint, rw - 16), x0, y + 29, impossible ? Ui.BAD : Ui.MUTED);
         }
         c.disableScissor();
 
-        Ui.text(c, this.textRenderer, "Looking for", rx, py + 22, Ui.MUTED);
-        Ui.text(c, this.textRenderer, TradeReroller.pretty(want) + " " + cfg.rerollMinLevel + "+", rx, py + 34, Ui.ACCENT);
-        Ui.text(c, this.textRenderer, "for at most " + cfg.rerollMaxCost + " emeralds", rx, py + 46, Ui.TEXT);
-        Ui.text(c, this.textRenderer, "Max price (emeralds, 1-64)", rx, py + 122, Ui.MUTED);
-
-        VillagerEntity v = TradeReroller.lastVillager();
-        int infoY = py + 184;
         boolean tc = TradeReroller.cyclingModLoaded();
-        Ui.text(c, this.textRenderer, tc ? "Trade Cycling mod found: Auto uses its cycle key."
-                : "Trade Cycling mod not found: Auto breaks the job block.", rx, infoY, tc ? Ui.GOOD : Ui.MUTED);
-        Ui.text(c, this.textRenderer, "Stand within 3 blocks of an untraded villager.", rx, infoY + 11, Ui.MUTED);
-        Ui.text(c, this.textRenderer, "Breaking needs the job block in your hotbar.", rx, infoY + 22, Ui.MUTED);
-        Ui.text(c, this.textRenderer, "Many servers forbid automation. Check first.", rx, infoY + 33, Ui.WARN);
-        if (v == null) {
-            Ui.text(c, this.textRenderer, "Right-click a villager once, or look at one.", rx, infoY + 44, Ui.MUTED);
-        }
-        String line = System.currentTimeMillis() < messageUntil ? message : TradeReroller.status();
-        if (line != null && !line.isEmpty()) {
-            Ui.text(c, this.textRenderer, this.textRenderer.trimToWidth(line, px + pw - 8 - rx), rx, py + ph - 14, Ui.ACCENT);
-        }
+        String note = System.currentTimeMillis() < messageUntil ? message
+                : TradeReroller.status() != null && !TradeReroller.status().isEmpty() ? TradeReroller.status()
+                : tc ? "Trade Cycling found: Auto clicks its button. Escape stops a reroll."
+                : "Trade Cycling not found: Auto breaks the job block. Escape stops a reroll.";
+        Ui.text(c, this.textRenderer, this.textRenderer.trimToWidth(note, rw), rx, py + ph - 62, Ui.ACCENT);
 
         drawButtons(c, mouseX, mouseY);
+    }
+
+    private void smallButton(DrawContext c, int mx, int my, int x, int y, int w, String label) {
+        Ui.button(c, this.textRenderer, x, y, w, 12, label, Ui.inside(mx, my, x, y, w, 12), true, false);
+    }
+
+    private boolean hit(double mx, double my, int x, int y, int w) {
+        return Ui.inside(mx, my, x, y, w, 12);
     }
 
     @Override
@@ -196,10 +232,50 @@ public class RerollScreen extends ThemedScreen {
         if (click.button() != 0) {
             return false;
         }
-        if (Ui.inside(click.x(), click.y(), px + 4, listTop, listW, listBottom - listTop)) {
-            int index = (int) ((click.y() - listTop - 3 + scroll) / ROW_H);
+        double mx = click.x();
+        double my = click.y();
+
+        if (Ui.inside(mx, my, px + 4, listTop, listW, listBottom - listTop)) {
+            int index = (int) ((my - listTop - 3 + scrollL) / ROW_H);
             if (index >= 0 && index < shown.size()) {
-                cfg.rerollEnchant = shown.get(index);
+                String id = shown.get(index);
+                ModConfig.Wish existing = wishFor(id);
+                if (existing != null) {
+                    cfg.rerollWishes.remove(existing);
+                } else {
+                    cfg.rerollWishes.add(new ModConfig.Wish(id, EnchantInfo.maxLevel(id), 64));
+                }
+                cfg.save();
+                clickSound();
+                return true;
+            }
+        }
+
+        if (Ui.inside(mx, my, rx, wishTop, rw, wishBottom - wishTop)) {
+            for (int i = 0; i < cfg.rerollWishes.size(); i++) {
+                ModConfig.Wish w = cfg.rerollWishes.get(i);
+                int y = wishTop + 3 + i * WISH_H - (int) scrollR;
+                int x0 = rx + 6;
+                int ly = y + 16;
+                int cx = x0 + 92;
+                int max = EnchantInfo.maxLevel(w.enchant);
+                if (hit(mx, my, rx + rw - 20, y + 2, 14)) {
+                    cfg.rerollWishes.remove(i);
+                } else if (hit(mx, my, x0 + 32, ly, 12)) {
+                    w.minLevel = MathHelper.clamp(w.minLevel - 1, 1, max);
+                } else if (hit(mx, my, x0 + 66, ly, 12)) {
+                    w.minLevel = MathHelper.clamp(w.minLevel + 1, 1, max);
+                } else if (hit(mx, my, cx + 46, ly, 18)) {
+                    w.maxCost = MathHelper.clamp(w.maxCost - 8, 1, 64);
+                } else if (hit(mx, my, cx + 66, ly, 14)) {
+                    w.maxCost = MathHelper.clamp(w.maxCost - 1, 1, 64);
+                } else if (hit(mx, my, cx + 100, ly, 14)) {
+                    w.maxCost = MathHelper.clamp(w.maxCost + 1, 1, 64);
+                } else if (hit(mx, my, cx + 116, ly, 18)) {
+                    w.maxCost = MathHelper.clamp(w.maxCost + 8, 1, 64);
+                } else {
+                    continue;
+                }
                 cfg.save();
                 clickSound();
                 return true;
@@ -210,7 +286,11 @@ public class RerollScreen extends ThemedScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        scroll = MathHelper.clamp(scroll - verticalAmount * ROW_H * 2, 0.0, maxScroll());
+        if (mouseX >= rx) {
+            scrollR = MathHelper.clamp(scrollR - verticalAmount * 16, 0.0, maxScrollR());
+        } else {
+            scrollL = MathHelper.clamp(scrollL - verticalAmount * ROW_H * 2, 0.0, maxScrollL());
+        }
         return true;
     }
 

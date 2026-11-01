@@ -6,7 +6,10 @@ import dev.skinoverride.DamageNumbers;
 import dev.skinoverride.HotbarCooldowns;
 import dev.skinoverride.LightOverlay;
 import dev.skinoverride.ModConfig;
+import dev.skinoverride.OreXray;
 import dev.skinoverride.SkinOverrideClient;
+import dev.skinoverride.SuperSecretSettings;
+import dev.skinoverride.TradeReroller;
 import dev.skinoverride.WorldLabels;
 import dev.skinoverride.map.WaypointLabels;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -70,7 +73,16 @@ public final class HudManager {
         HudElementRegistry.attachElementAfter(
                 VanillaHudElements.CHAT,
                 Identifier.of(SkinOverrideClient.MOD_ID, "hud"),
-                (context, tickCounter) -> renderAll(context));
+                (context, tickCounter) -> {
+                    TradeReroller.pollEscape(MinecraftClient.getInstance()); // Escape always stops the reroller
+                    renderAll(context);
+                });
+
+        // Super Secret Settings: a screen effect drawn over the world, under the rest of the HUD.
+        HudElementRegistry.attachElementBefore(
+                VanillaHudElements.CROSSHAIR,
+                Identifier.of(SkinOverrideClient.MOD_ID, "super_secret_settings"),
+                (context, tickCounter) -> SuperSecretSettings.render(context, MinecraftClient.getInstance()));
 
         // Our effect timers replace the vanilla effect icons while enabled.
         HudElementRegistry.replaceElement(
@@ -107,6 +119,9 @@ public final class HudManager {
         ModConfig cfg = ModConfig.get();
         boolean shot = CleanScreenshot.capturing();
         boolean panelsHidden = allHidden || (shot && cfg.shotHideModHud);
+        if (!shot) {
+            OreXray.render(context, mc);
+        }
         for (HudWidget w : WIDGETS) {
             if (panelsHidden || isHidden(w) || !w.enabled() || !w.visible(mc)) {
                 continue;

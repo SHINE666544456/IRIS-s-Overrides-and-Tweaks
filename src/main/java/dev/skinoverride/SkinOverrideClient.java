@@ -51,6 +51,8 @@ public class SkinOverrideClient implements ClientModInitializer {
     private static KeyBinding radarKey;
     private static KeyBinding rerollKey;
     private static KeyBinding hudToggleKey;
+    private static KeyBinding xrayKey;
+    private static KeyBinding sssKey;
 
     @Override
     public void onInitializeClient() {
@@ -100,6 +102,10 @@ public class SkinOverrideClient implements ClientModInitializer {
                 "key.skinoverride.cave", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, KeyBinding.Category.MISC));
         radarKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.skinoverride.radar", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, KeyBinding.Category.MISC));
+        xrayKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.skinoverride.orexray", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, KeyBinding.Category.MISC));
+        sssKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.skinoverride.sss", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, KeyBinding.Category.MISC));
         hudToggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.skinoverride.hudtoggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, KeyBinding.Category.MISC));
         rerollKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -223,6 +229,17 @@ public class SkinOverrideClient implements ClientModInitializer {
                 if (client.player != null) {
                     client.inGameHud.setOverlayMessage(Text.literal("Radar " + (cfg.radarOn ? "on" : "off")), false);
                 }
+            }
+            while (xrayKey.wasPressed()) {
+                ModConfig cfg = ModConfig.get();
+                cfg.oreXray = !cfg.oreXray;
+                cfg.save();
+                if (client.player != null) {
+                    client.inGameHud.setOverlayMessage(Text.literal("Ore outlines " + (cfg.oreXray ? "on" : "off")), false);
+                }
+            }
+            while (sssKey.wasPressed()) {
+                SuperSecretSettings.cycle(client);
             }
             while (hudToggleKey.wasPressed()) {
                 HudManager.toggleAll();

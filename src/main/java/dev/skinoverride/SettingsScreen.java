@@ -67,6 +67,14 @@ public class SettingsScreen extends ThemedScreen {
     private final Screen parent;
     private final ModConfig cfg = ModConfig.get();
 
+    private static String[] effectNames() {
+        String[] names = new String[SuperSecretSettings.count()];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = SuperSecretSettings.name(i);
+        }
+        return names;
+    }
+
     private int tab;
     private double scroll;
     private Slider dragging;
@@ -338,6 +346,28 @@ public class SettingsScreen extends ThemedScreen {
                 r.add(new Slider("Fire height", "How far the flames are lowered.", 10, 60, 5,
                         v -> String.format(java.util.Locale.ROOT, "%.2f", v / 100.0),
                         () -> cfg.lowFireOffset, v -> cfg.lowFireOffset = v));
+                r.add(new Header("Super Secret Settings"));
+                r.add(new Cycle("Screen effect", "The old 1.7.2 joke button. Colored filters and lines over the world.",
+                        effectNames(), () -> cfg.sssIndex, v -> cfg.sssIndex = v));
+                r.add(new Note("Overlay version: the original used shaders. A key for the next effect is in Controls."));
+                r.add(new Header("Ore outlines (just for fun)"));
+                r.add(new Toggle("Ore outlines", "Boxes around ores, even through walls.",
+                        () -> cfg.oreXray, v -> cfg.oreXray = v));
+                r.add(new Note("This is x-ray: many servers ban it. Use it in singleplayer or where it is allowed."));
+                r.add(new Slider("Search radius", "How far around you it looks.", 4, 24, 2,
+                        v -> v + " blocks", () -> cfg.xrayRadius, v -> cfg.xrayRadius = v));
+                r.add(new Toggle("Names and distance", "A small label above the nearest ores.",
+                        () -> cfg.xrayLabels, v -> cfg.xrayLabels = v));
+                r.add(new Toggle("Coal", "Gray.", () -> cfg.xrayCoal, v -> cfg.xrayCoal = v));
+                r.add(new Toggle("Iron", "Peach.", () -> cfg.xrayIron, v -> cfg.xrayIron = v));
+                r.add(new Toggle("Copper", "Orange.", () -> cfg.xrayCopper, v -> cfg.xrayCopper = v));
+                r.add(new Toggle("Gold", "Yellow (also nether gold).", () -> cfg.xrayGold, v -> cfg.xrayGold = v));
+                r.add(new Toggle("Redstone", "Red.", () -> cfg.xrayRedstone, v -> cfg.xrayRedstone = v));
+                r.add(new Toggle("Lapis", "Blue.", () -> cfg.xrayLapis, v -> cfg.xrayLapis = v));
+                r.add(new Toggle("Diamond", "Cyan.", () -> cfg.xrayDiamond, v -> cfg.xrayDiamond = v));
+                r.add(new Toggle("Emerald", "Green.", () -> cfg.xrayEmerald, v -> cfg.xrayEmerald = v));
+                r.add(new Toggle("Nether quartz", "White.", () -> cfg.xrayQuartz, v -> cfg.xrayQuartz = v));
+                r.add(new Toggle("Ancient debris", "Brown.", () -> cfg.xrayDebris, v -> cfg.xrayDebris = v));
                 r.add(new Header("Screenshots"));
                 r.add(new Action("Clean screenshot", "Hides the HUD; player name tags stay. Key: F9.", "Take now",
                         () -> {

@@ -146,8 +146,8 @@ public final class TradeReroller {
             return "Join a world first";
         }
         ModConfig cfg = ModConfig.get();
-        if (cfg.rerollEnchant == null || cfg.rerollEnchant.isBlank()) {
-            return "Pick an enchantment first (Reroll setup)";
+        if (cfg.rerollWishes.isEmpty()) {
+            return "Add at least one enchantment to the wishlist (Reroll setup)";
         }
         VillagerEntity v = target;
         if (v == null && lastVillager != null && lastVillager.isAlive() && !lastVillager.isRemoved()
@@ -227,13 +227,16 @@ public final class TradeReroller {
         timer = 0;
         state = mc.currentScreen instanceof MerchantScreen ? State.CHECK : State.INTERACT;
         status = "Starting...";
-        mc.inGameHud.setOverlayMessage(Text.literal("Rerolling for " + wantedText(cfg) + " (press the reroll key to stop)"), false);
+        mc.inGameHud.setOverlayMessage(Text.literal("Rerolling for " + wantedText(cfg) + " (Escape stops it)"), false);
         return null;
     }
 
     private static String wantedText(ModConfig cfg) {
-        return prettyName(cfg.rerollEnchant.replace("minecraft:", "")) + " " + cfg.rerollMinLevel + "+ for max "
-                + cfg.rerollMaxCost + " emeralds";
+        if (cfg.rerollWishes.size() == 1) {
+            ModConfig.Wish w = cfg.rerollWishes.get(0);
+            return EnchantInfo.pretty(w.enchant) + " " + w.minLevel + "+ for max " + w.maxCost + " emeralds";
+        }
+        return cfg.rerollWishes.size() + " wishlist enchantments";
     }
 
     public static void stop(MinecraftClient mc, String message) {
@@ -264,8 +267,21 @@ public final class TradeReroller {
         }
     }
 
+    private static State watchedState = State.OFF;
+    private static int stateTicks;
+
     public static void tick(MinecraftClient mc) {
+        pollEscape(mc);
         if (state == State.OFF) {
+            watchedState = State.OFF;
+            return;
+        }
+        // safety net: if one step takes far too long, stop instead of getting stuck
+        if (state != watchedState) {
+            watchedState = state;
+            stateTicks = 0;
+        } else if (++stateTicks > 600 && state != State.WAIT_JOB) {
+            stop(mc, "Reroll stopped: it got stuck on one step");
             return;
         }
         if (mc.player == null || mc.world == null || mc.interactionManager == null) {
@@ -432,7 +448,7 @@ public final class TradeReroller {
             lastSig = now;
             status = "Try " + rolls + ": no match yet (cycling)";
             mc.inGameHud.setOverlayMessage(Text.literal("Reroll try " + rolls + " of " + cfg.rerollMaxTries
-                    + " (" + prettyName(cfg.rerollEnchant.replace("minecraft:", "")) + ")"), false);
+                    + " (wishlist)"), false);
             pressCycleKey(mc, screen, cfg);
             state = State.WAIT_CYCLE;
             timer = 0;
@@ -451,7 +467,7 @@ public final class TradeReroller {
         lastSig = now;
         status = "Try " + rolls + ": no match yet";
         mc.inGameHud.setOverlayMessage(Text.literal("Reroll try " + rolls + " of " + cfg.rerollMaxTries
-                + " (" + prettyName(cfg.rerollEnchant.replace("minecraft:", "")) + ")"), false);
+                + " (wishlist)"), false);
 
         mc.player.closeHandledScreen();
         state = State.BREAK;
@@ -471,11 +487,39 @@ public final class TradeReroller {
         return false;
     }
 
-    /** Presses the Trade Cycling key (C by default) as if you did, on the open trade screen. */
+    /**
+     * Clicks the Trade Cycling mod's cycle button on the open trade screen (the arrow at the top left). The button
+     * is found as the widget that does not belong to the game or to this mod. If there is none, its key is pressed.
+     */
     private static void pressCycleKey(MinecraftClient mc, MerchantScreen screen, ModConfig cfg) {
+        int enterScan = org.lwjgl.glfw.GLFW.glfwGetKeyScancode(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER);
+        for (var child : screen.children()) {
+            if (!(child instanceof ClickableWidget widget) || !widget.visible || !widget.active) {
+                continue;
+            }
+            String name = widget.getClass().getName();
+            if (name.startsWith("net.minecraft.") || name.startsWith("dev.skinoverride.") || name.startsWith("net.fabricmc.")) {
+                continue;
+            }
+            // a button "presses" itself when it gets Enter, no mouse position needed
+            if (widget.keyPressed(new net.minecraft.client.input.KeyInput(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, enterScan, 0))) {
+                return;
+            }
+        }
         int key = cfg.rerollCycleKey;
         int scan = org.lwjgl.glfw.GLFW.glfwGetKeyScancode(key);
         screen.keyPressed(new net.minecraft.client.input.KeyInput(key, scan, 0));
+    }
+
+    /** Escape stops the reroll at once, from anywhere (checked every frame, even with a menu open). */
+    public static void pollEscape(MinecraftClient mc) {
+        if (state == State.OFF || mc.getWindow() == null) {
+            return;
+        }
+        if (org.lwjgl.glfw.GLFW.glfwGetKey(mc.getWindow().getHandle(), org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)
+                == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
+            stop(mc, "Reroll stopped (Escape)");
+        }
     }
 
     private static String signature(TradeOfferList offers) {
@@ -500,7 +544,7 @@ public final class TradeReroller {
             timer = 0;
             return;
         }
-        if (++timer >= 12) {
+        if (++timer >= 6) {
             timer = 0;
             cycleFails++;
             if (cycleFails >= 5) {
@@ -553,14 +597,7 @@ public final class TradeReroller {
     }
 
     private static String roman(int n) {
-        return switch (n) {
-            case 1 -> "I";
-            case 2 -> "II";
-            case 3 -> "III";
-            case 4 -> "IV";
-            case 5 -> "V";
-            default -> String.valueOf(n);
-        };
+        return EnchantInfo.roman(n);
     }
 
     // ---------- reading trades ----------
@@ -589,7 +626,6 @@ public final class TradeReroller {
         if (comp == null) {
             return null;
         }
-        String want = cfg.rerollEnchant.toLowerCase(Locale.ROOT).replace("minecraft:", "").trim();
         ItemStack first = offer.getDisplayedFirstBuyItem();
         int cost = first.getCount();
         boolean priced = first.isOf(Items.EMERALD);
@@ -600,8 +636,11 @@ public final class TradeReroller {
             }
             String path = key.get().getValue().getPath();
             int level = comp.getLevel(e);
-            if (path.equals(want) && level >= cfg.rerollMinLevel && (!priced || cost <= cfg.rerollMaxCost)) {
-                return prettyName(path) + " " + level + (priced ? " for " + cost + " emeralds" : "");
+            for (ModConfig.Wish wish : cfg.rerollWishes) {
+                String want = wish.enchant.toLowerCase(Locale.ROOT).replace("minecraft:", "").trim();
+                if (path.equals(want) && level >= wish.minLevel && (!priced || cost <= wish.maxCost)) {
+                    return prettyName(path) + " " + level + (priced ? " for " + cost + " emeralds" : "");
+                }
             }
         }
         return null;
@@ -609,15 +648,7 @@ public final class TradeReroller {
 
     /** The villager-tradable enchantments, for the setup screen. */
     public static List<String> knownEnchants() {
-        List<String> list = new ArrayList<>(List.of(
-                "mending", "unbreaking", "efficiency", "fortune", "silk_touch", "sharpness", "smite",
-                "bane_of_arthropods", "knockback", "fire_aspect", "looting", "sweeping_edge", "power", "punch",
-                "flame", "infinity", "luck_of_the_sea", "lure", "loyalty", "impaling", "riptide", "channeling",
-                "multishot", "quick_charge", "piercing", "protection", "fire_protection", "blast_protection",
-                "projectile_protection", "feather_falling", "respiration", "aqua_affinity", "thorns",
-                "depth_strider", "frost_walker", "binding_curse", "vanishing_curse", "soul_speed", "swift_sneak"));
-        list.sort(String::compareTo);
-        return list;
+        return EnchantInfo.ids();
     }
 
     public static String pretty(String path) {

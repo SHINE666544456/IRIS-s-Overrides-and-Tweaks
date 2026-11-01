@@ -247,6 +247,24 @@ public final class ModConfig {
     public boolean wmShare = true;
     public boolean wmShowOthers = true;
 
+    // ore outlines through walls (just for fun)
+    public boolean oreXray = false;
+    public int xrayRadius = 16;
+    public boolean xrayLabels = true;
+    public boolean xrayCoal = false;
+    public boolean xrayIron = true;
+    public boolean xrayCopper = false;
+    public boolean xrayGold = true;
+    public boolean xrayRedstone = true;
+    public boolean xrayLapis = true;
+    public boolean xrayDiamond = true;
+    public boolean xrayEmerald = true;
+    public boolean xrayQuartz = true;
+    public boolean xrayDebris = true;
+
+    /** Super Secret Settings screen effect (0 = off) */
+    public int sssIndex = 0;
+
     // clean screenshot: what hides and what stays
     /** hide the whole vanilla HUD (hotbar, chat, crosshair ...); this also hides everything of ours */
     public boolean shotHideVanillaHud = true;
@@ -267,6 +285,10 @@ public final class ModConfig {
     public int rerollMethod = 0;
     /** GLFW key code of the Trade Cycling mod's cycle key (C by default) */
     public int rerollCycleKey = 67;
+    /** The enchantments you are looking for; the reroller stops at the first trade that fits any of them. */
+    public List<Wish> rerollWishes = new ArrayList<>();
+    /** Old single-enchantment settings, copied into the wishlist once. */
+    public boolean rerollMigrated = false;
     public String rerollEnchant = "mending";
     public int rerollMinLevel = 1;
     public int rerollMaxCost = 64;
@@ -322,8 +344,35 @@ public final class ModConfig {
     }
 
 
+    /** One wishlist entry for the trade reroller. */
+    public static class Wish {
+        public String enchant = "mending";
+        public int minLevel = 1;
+        public int maxCost = 64;
+
+        public Wish() {
+        }
+
+        public Wish(String enchant, int minLevel, int maxCost) {
+            this.enchant = enchant;
+            this.minLevel = minLevel;
+            this.maxCost = maxCost;
+        }
+    }
+
     /** Fixes up anything a hand-edited or older file left empty. */
     private void normalize() {
+        if (rerollWishes == null) {
+            rerollWishes = new ArrayList<>();
+        }
+        if (!rerollMigrated) {
+            rerollMigrated = true;
+            if (rerollWishes.isEmpty() && rerollEnchant != null && !rerollEnchant.isBlank()) {
+                rerollWishes.add(new Wish(rerollEnchant.replace("minecraft:", ""), Math.max(1, rerollMinLevel),
+                        Math.max(1, Math.min(64, rerollMaxCost))));
+            }
+        }
+        rerollWishes.removeIf(w -> w == null || w.enchant == null || w.enchant.isBlank());
         if (positions == null) {
             positions = new HashMap<>();
         }
