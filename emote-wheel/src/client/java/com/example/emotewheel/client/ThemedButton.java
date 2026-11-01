@@ -7,8 +7,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
 /**
- * A button drawn in the Iris theme (rounded dark box, accent border on hover). Use {@link #builder}
- * exactly like {@code Button.builder}.
+ * A button drawn in the Iris theme (rounded dark box, accent border on hover). Use {@link #create}
+ * like {@code Button.builder}.
  */
 public class ThemedButton extends Button.Plain {
 
@@ -69,7 +69,7 @@ public class ThemedButton extends Button.Plain {
         g.drawString(font, label, tx, y + (h - 8) / 2, textColor);
     }
 
-    public static Builder builder(Component message, Button.OnPress onPress) {
+    public static Builder create(Component message, Button.OnPress onPress) {
         return new Builder(message, onPress);
     }
 

@@ -87,7 +87,7 @@ public class EmoteMenuScreen extends Screen {
         });
         addRenderableWidget(search);
 
-        filterBtn = ThemedButton.builder(Component.literal("All"), b -> {
+        filterBtn = ThemedButton.create(Component.literal("All"), b -> {
             filterIdx = (filterIdx + 1) % filterCount();
             listPage = 0;
             persistMenuPage();
@@ -105,19 +105,19 @@ public class EmoteMenuScreen extends Screen {
         for (int i = 0; i < perPage; i++) {
             final int idx = i;
             int r = i / cols, c = i % cols;
-            Button b = ThemedButton.builder(Component.empty(), btn -> onGridClick(idx))
+            Button b = ThemedButton.create(Component.empty(), btn -> onGridClick(idx))
                 .bounds(leftX + 8 + c * (cellW + 4), gridTop + r * (cellH + 3), cellW, cellH).inset(22).build();
             grid.add(b);
             addRenderableWidget(b);
         }
 
         navY = gridTop + rows * (cellH + 3) + 6;
-        prevBtn = ThemedButton.builder(Component.literal("<"), b -> {
+        prevBtn = ThemedButton.create(Component.literal("<"), b -> {
             listPage--;
             persistMenuPage();
             refresh();
         }).bounds(leftX + 8, navY, 28, 18).build();
-        nextBtn = ThemedButton.builder(Component.literal(">"), b -> {
+        nextBtn = ThemedButton.create(Component.literal(">"), b -> {
             listPage++;
             persistMenuPage();
             refresh();
@@ -128,7 +128,7 @@ public class EmoteMenuScreen extends Screen {
         int pw = (rightW - 12) / 3;
         for (int p = 0; p < EmoteConfig.PAGES; p++) {
             final int pp = p;
-            pageBtns[p] = ThemedButton.builder(Component.literal("P" + (p + 1)), b -> {
+            pageBtns[p] = ThemedButton.create(Component.literal("P" + (p + 1)), b -> {
                 page = pp;
                 EmoteConfig cfg = EmoteConfig.get();
                 cfg.page = pp;
@@ -140,32 +140,32 @@ public class EmoteMenuScreen extends Screen {
         int sw = (rightW - 12) / 2;
         for (int s = 0; s < SLOTS; s++) {
             final int ss = s;
-            slotBtns[s] = ThemedButton.builder(Component.empty(), b -> {
+            slotBtns[s] = ThemedButton.create(Component.empty(), b -> {
                 selSlot = (selSlot == ss) ? -1 : ss;
                 refresh();
             }).bounds(rx + 6 + (s % 2) * (sw + 4), 60 + (s / 2) * 22, sw, 20).inset(22).build();
             addRenderableWidget(slotBtns[s]);
         }
 
-        playBtn = ThemedButton.builder(Component.literal("\u25B6 Play"), b -> {
+        playBtn = ThemedButton.create(Component.literal("\u25B6 Play"), b -> {
             if (selected != null) {
                 minecraft.setScreen(null);
                 EmoteClient.playLocal(selected);
             }
         }).bounds(rx + 6, height - 78, sw, 20).build();
-        favBtn = ThemedButton.builder(Component.literal("\u2605 Fav"), b -> {
+        favBtn = ThemedButton.create(Component.literal("\u2605 Fav"), b -> {
             if (selected != null) {
                 EmoteConfig.get().toggleFavorite(selected.id());
                 refresh();
             }
         }).bounds(rx + 6 + sw + 4, height - 78, sw, 20).build();
-        clearBtn = ThemedButton.builder(Component.literal("Clear Slot"), b -> {
+        clearBtn = ThemedButton.create(Component.literal("Clear Slot"), b -> {
             if (selSlot >= 0) {
                 EmoteConfig.get().setSlot(page, selSlot, null);
                 refresh();
             }
         }).bounds(rx + 6, height - 54, sw, 20).build();
-        randomBtn = ThemedButton.builder(Component.literal("Random"), b -> {
+        randomBtn = ThemedButton.create(Component.literal("Random"), b -> {
             List<Emote> pool = filtered();
             if (pool.isEmpty()) pool = EmoteAccess.visible();
             if (pool.isEmpty()) return;
@@ -177,7 +177,7 @@ public class EmoteMenuScreen extends Screen {
             }
             refresh();
         }).bounds(rx + 6 + sw + 4, height - 54, sw, 20).build();
-        settingsBtn = ThemedButton.builder(Component.literal("Settings"), b ->
+        settingsBtn = ThemedButton.create(Component.literal("Settings"), b ->
             minecraft.setScreen(new EmoteSettingsScreen(this))).bounds(rx + 6, height - 30, rightW - 12, 18).build();
 
         addRenderableWidget(playBtn);

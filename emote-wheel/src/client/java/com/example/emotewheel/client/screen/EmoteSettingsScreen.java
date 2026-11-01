@@ -80,7 +80,7 @@ public class EmoteSettingsScreen extends Screen {
         for (int i = 0; i < opts.size(); i++) {
             final Opt o = opts.get(i);
             int x = (i % 2 == 0) ? x0 : x1, y = y0 + (i / 2) * rowH;
-            Button b = ThemedButton.builder(Component.literal(o.label().get()), btn -> {
+            Button b = ThemedButton.create(Component.literal(o.label().get()), btn -> {
                 o.action().run();
                 c.save();
                 refreshLabels();
@@ -101,15 +101,15 @@ public class EmoteSettingsScreen extends Screen {
             cloneCountBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
             addRenderableWidget(cloneCountBox);
 
-            addRenderableWidget(ThemedButton.builder(Component.literal("-10"), b -> nudgeClones(-10))
+            addRenderableWidget(ThemedButton.create(Component.literal("-10"), b -> nudgeClones(-10))
                 .bounds(cx - 140, cy - 1, 40, 20).build());
-            addRenderableWidget(ThemedButton.builder(Component.literal("-1"), b -> nudgeClones(-1))
+            addRenderableWidget(ThemedButton.create(Component.literal("-1"), b -> nudgeClones(-1))
                 .bounds(cx - 96, cy - 1, 36, 20).build());
-            addRenderableWidget(ThemedButton.builder(Component.literal("+1"), b -> nudgeClones(1))
+            addRenderableWidget(ThemedButton.create(Component.literal("+1"), b -> nudgeClones(1))
                 .bounds(cx + 32, cy - 1, 36, 20).build());
-            addRenderableWidget(ThemedButton.builder(Component.literal("+10"), b -> nudgeClones(10))
+            addRenderableWidget(ThemedButton.create(Component.literal("+10"), b -> nudgeClones(10))
                 .bounds(cx + 72, cy - 1, 40, 20).build());
-            addRenderableWidget(ThemedButton.builder(Component.literal("Apply"), b -> applyCloneCount())
+            addRenderableWidget(ThemedButton.create(Component.literal("Apply"), b -> applyCloneCount())
                 .bounds(cx + 116, cy - 1, 50, 20).build());
         } else {
             cloneCountBox = null;
@@ -124,7 +124,7 @@ public class EmoteSettingsScreen extends Screen {
         addRenderableWidget(outerBox);
         addRenderableWidget(innerBox);
         addRenderableWidget(tailBox);
-        addRenderableWidget(ThemedButton.builder(Component.literal("Save colours"), b -> saveColours())
+        addRenderableWidget(ThemedButton.create(Component.literal("Save colours"), b -> saveColours())
             .bounds(x1, hy + 24, colW, 20).build());
 
         // Mob colour presets (two rows)
@@ -137,12 +137,12 @@ public class EmoteSettingsScreen extends Screen {
             int row = i / 5, col = i % 5;
             int px = px0 + col * (presetW + presetGap);
             int pyy = py + row * 22;
-            addRenderableWidget(ThemedButton.builder(Component.literal(p[0]), b -> applyPreset(p))
+            addRenderableWidget(ThemedButton.create(Component.literal(p[0]), b -> applyPreset(p))
                 .bounds(px, pyy, presetW, 20).build());
         }
 
         int doneY = Math.min(height - 28, py + 50);
-        addRenderableWidget(ThemedButton.builder(Component.literal("Done"), b -> onClose())
+        addRenderableWidget(ThemedButton.create(Component.literal("Done"), b -> onClose())
             .bounds(width / 2 - 60, doneY, 120, 20).build());
     }
 

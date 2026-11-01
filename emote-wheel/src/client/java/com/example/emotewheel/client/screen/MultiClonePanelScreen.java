@@ -45,17 +45,17 @@ public class MultiClonePanelScreen extends Screen {
         countBox.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
         addRenderableWidget(countBox);
 
-        addRenderableWidget(ThemedButton.builder(Component.literal("-10"), b -> nudge(-10))
+        addRenderableWidget(ThemedButton.create(Component.literal("-10"), b -> nudge(-10))
             .bounds(x, y + 28, 32, 20).build());
-        addRenderableWidget(ThemedButton.builder(Component.literal("-1"), b -> nudge(-1))
+        addRenderableWidget(ThemedButton.create(Component.literal("-1"), b -> nudge(-1))
             .bounds(x + 34, y + 28, 28, 20).build());
-        addRenderableWidget(ThemedButton.builder(Component.literal("+1"), b -> nudge(1))
+        addRenderableWidget(ThemedButton.create(Component.literal("+1"), b -> nudge(1))
             .bounds(x + 130, y + 28, 28, 20).build());
-        addRenderableWidget(ThemedButton.builder(Component.literal("+10"), b -> nudge(10))
+        addRenderableWidget(ThemedButton.create(Component.literal("+10"), b -> nudge(10))
             .bounds(x + 160, y + 28, 32, 20).build());
-        addRenderableWidget(ThemedButton.builder(Component.literal("Apply"), b -> apply())
+        addRenderableWidget(ThemedButton.create(Component.literal("Apply"), b -> apply())
             .bounds(x, y + 54, 70, 20).build());
-        addRenderableWidget(ThemedButton.builder(Component.literal("Hide"), b -> onClose())
+        addRenderableWidget(ThemedButton.create(Component.literal("Hide"), b -> onClose())
             .bounds(x + 74, y + 54, 70, 20).build());
     }
 
