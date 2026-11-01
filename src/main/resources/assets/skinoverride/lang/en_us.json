@@ -17,5 +17,7 @@
   "key.skinoverride.cave": "Cycle cave map (off / auto / always)",
   "key.skinoverride.radar": "Toggle entity radar",
   "key.skinoverride.reroll": "Villager reroller: open setup / stop",
-  "key.skinoverride.hudtoggle": "Hide / show all IRIS HUD panels"
+  "key.skinoverride.hudtoggle": "Hide / show all IRIS HUD panels",
+  "key.skinoverride.orexray": "Toggle ore outlines (x-ray)",
+  "key.skinoverride.sss": "Super Secret Settings: next effect"
 }
