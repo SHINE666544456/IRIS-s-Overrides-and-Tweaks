@@ -546,17 +546,22 @@ public final class TradeReroller {
         }
         String sig = signature(screen.getScreenHandler().getRecipes());
         if (!sig.isEmpty() && !sig.equals(lastSig)) {
+            // The new trades arrived. Look at them right now, in this same tick, so no further click can happen
+            // before we know whether they are the ones you wanted.
             cycleFails = 0;
             state = State.CHECK;
             timer = 0;
+            check(mc, ModConfig.get());
             return;
         }
-        if (++timer >= 6) {
+        // Never click again just because the answer is slow (a laggy connection would then replace a good
+        // trade with another one). Only after a long silence is the click treated as lost.
+        if (++timer >= 60) {
             timer = 0;
             cycleFails++;
-            if (cycleFails >= 5) {
+            if (cycleFails >= 3) {
                 if (canFallBack) {
-                    // the cycle key did nothing: use the job block method instead
+                    // the cycle button did nothing: use the job block method instead
                     useCycling = false;
                     canFallBack = false;
                     sameCount = 0;
@@ -565,8 +570,8 @@ public final class TradeReroller {
                     mc.player.closeHandledScreen();
                     state = State.BREAK;
                 } else {
-                    stop(mc, "Reroll stopped: the trades did not change. Is the cycle key right (Reroll setup), "
-                            + "is the villager already traded with, and is Trade Cycling on the server?");
+                    stop(mc, "Reroll stopped: the trades did not change. Is the villager already traded with, "
+                            + "and is Trade Cycling on the server?");
                 }
                 return;
             }
