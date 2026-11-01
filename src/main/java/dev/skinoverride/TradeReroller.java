@@ -10,7 +10,6 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.enchantment.Enchantment;
@@ -423,7 +422,7 @@ public final class TradeReroller {
                 status = "Found " + hit;
                 mc.inGameHud.setOverlayMessage(Text.literal("Found " + hit + " after " + rolls + " tries"), false);
                 mc.player.sendMessage(Text.literal("[Reroll] Found " + hit + " after " + rolls + " tries"), false);
-                mc.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f));
+                mc.player.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
                 return;
             }
             sig.append(describe(offer)).append('|');

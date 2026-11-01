@@ -2,7 +2,6 @@ package dev.skinoverride.chat;
 
 import dev.skinoverride.ModConfig;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -149,13 +148,14 @@ public final class ChatExtras {
     }
 
     public static void playSound(MinecraftClient mc, ModConfig cfg) {
-        if (!cfg.chatMentionSound || mc.getSoundManager() == null) {
+        if (!cfg.chatMentionSound || mc.player == null) {
             return;
         }
+        // Entity.playSound(sound, volume, pitch): for your own player it is heard only by you
         switch (cfg.chatMentionSoundChoice) {
-            case 1 -> mc.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.4f, 0.8f));
-            case 2 -> mc.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.2f, 1.0f));
-            default -> mc.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.2f, 1.0f));
+            case 1 -> mc.player.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
+            case 2 -> mc.player.playSound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 1.2f);
+            default -> mc.player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
         }
     }
 }
