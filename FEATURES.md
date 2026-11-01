@@ -1,4 +1,4 @@
-# Everything in Iris's Overrides, Tweaks, Emote wheel and armor (2.2.0)
+# Everything in Iris's Overrides, Tweaks, Emote wheel and armor (2.3.0)
 
 Keys (rebind under Controls): **K** skins, **J** settings, **C** zoom (hold), **G** fullbright, **F9** clean screenshot,
 **F8** freecam, **F7** light overlay, **M** full map, **V** add waypoint, **[ ]** minimap zoom, **R** sort,
@@ -38,7 +38,7 @@ Unbound by default: send my position, chat search, cycle cave map, toggle radar,
 
 ## Tools
 - Chest, barrel, shulker, hopper, dispenser and inventory sorter (merge + sort by ID) with on-screen Sort / Stash / Same buttons and optional auto-sort when opened.
-- Villager trade reroller: picks an enchantment, minimum level and maximum price and rerolls until it appears, with the Trade Cycling mod's key or by breaking the job block.
+- Villager trade reroller: picks an enchantment, minimum level and maximum price and rerolls until it appears, as a wishlist of enchantments (level and price limits, shows each one's max level and cheapest price), by clicking the Trade Cycling button or by breaking the job block. Escape stops it.
 - Villager trades panel: look at a villager to see its remembered enchanted book trades.
 - Weapon Master: hotbar swords, tools, trident, bows, shield and banner drawn on your character, shared with other players who have the mod.
 
@@ -47,6 +47,10 @@ Unbound by default: send my position, chat search, cycle cave map, toggle radar,
 - Walk-while-emoting, particle effects (off / light / full) and 3D jutsu props.
 - Cat / fox / bunny / bear ears, tails and a pet on your head with custom hex colors; Hinata and maid armor outfits (rename armor in an anvil).
 - Shadow clones and the Cat_Girl skin swap; other players see your emotes if the server and they have the mod.
+
+## Fun extras
+- Ore outlines through walls (per-ore switches, radius, labels). Many servers ban x-ray.
+- Super Secret Settings: cycle screen effects (overlay version).
 
 ## Armor and mobs
 - Maid and Hinata armor textures can each be switched off; armor can be hidden on you, on others or on everyone.
