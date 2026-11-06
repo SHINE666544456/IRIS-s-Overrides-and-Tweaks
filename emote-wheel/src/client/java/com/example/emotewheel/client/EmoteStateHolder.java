@@ -15,6 +15,9 @@ public interface EmoteStateHolder {
     /** True for real player render states (never for mobs). */
     void emotes$setPlayer(boolean player);
     boolean emotes$isPlayer();
+    /** Counts how many models have been set up from this render state this frame: 0 = the body model. */
+    int emotes$nextSetup();
+    void emotes$resetSetup();
     Emote emotes$getEmote();
     float emotes$getTime();
     int emotes$earStyle();

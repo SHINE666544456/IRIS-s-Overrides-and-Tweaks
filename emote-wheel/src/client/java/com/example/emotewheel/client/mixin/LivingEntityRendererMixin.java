@@ -56,6 +56,7 @@ public abstract class LivingEntityRendererMixin {
             at = @At("RETURN"))
     private void emotes$extract(LivingEntity entity, LivingEntityRenderState state, float partialTick, CallbackInfo ci) {
         if (!(state instanceof EmoteStateHolder holder)) return;
+        holder.emotes$resetSetup();
         holder.emotes$set(null, 0f);
         holder.emotes$setCat(0, 0);
         holder.emotes$setExtras(null, 0);

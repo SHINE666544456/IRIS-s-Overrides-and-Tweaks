@@ -76,21 +76,27 @@ public abstract class HumanoidModelMixin {
     // ------------------------------------------------------------------ per-frame
     @Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/HumanoidRenderState;)V", at = @At("RETURN"))
     private void emotes$setupAnim(HumanoidRenderState state, CallbackInfo ci) {
-        boolean isPlayer = (Object) this instanceof PlayerModel;
         EmoteStateHolder holder = (state instanceof EmoteStateHolder h) ? h : null;
+        EmoteConfig cfg = EmoteConfig.get();
 
-        if (isPlayer) {
-            // Maid ears belong to the ARMOR only, and the player's ears/tail/pet are drawn separately by LookParts.
-            // The body model must never draw any of these (that was the "ears stay on" bug).
+        // Each frame the game sets up the body model first and then the armor models (for players the armor
+        // models are PlayerModels too, so the class cannot tell them apart). Count the calls per render state:
+        // the first one is the body, every later one is armor.
+        boolean body = holder == null || holder.emotes$nextSetup() == 0;
+
+        // The ears and tail that come with the player mesh never show: the player's real ones are drawn
+        // separately by LookParts, and piglins, endermen and armor must not have any.
+        emotes$show(head, "emote_cat_ear_r", false);
+        emotes$show(head, "emote_cat_ear_l", false);
+        emotes$show(this.body, "emote_cat_tail", false);
+
+        if (body) {
+            // The body model never shows maid ears or thin sleeves; those belong to the armor models.
             emotes$show(head, "maid_ear_r", false);
             emotes$show(head, "maid_ear_l", false);
-            emotes$show(head, "emote_cat_ear_r", false);
-            emotes$show(head, "emote_cat_ear_l", false);
-            emotes$show(body, "emote_cat_tail", false);
 
-            // "Armor visibility": the armor layers are drawn after this model, from the same render state,
+            // "Armor visibility": the armor layers are drawn after the body, from the same render state,
             // so emptying the equipment here makes them draw nothing.
-            EmoteConfig cfg = EmoteConfig.get();
             if (cfg.armorVisibility != 0 && holder != null && holder.emotes$isPlayer()
                 && cfg.hideArmorFor(holder.emotes$isSelf())) {
                 state.headEquipment = ItemStack.EMPTY;
@@ -101,34 +107,28 @@ public abstract class HumanoidModelMixin {
                 state.feetEquipment = ItemStack.EMPTY;
             }
         } else {
-            // Ears and tail that come with the player mesh never show on armor or mobs (piglins, endermen ...).
-            emotes$show(head, "emote_cat_ear_r", false);
-            emotes$show(head, "emote_cat_ear_l", false);
-            emotes$show(body, "emote_cat_tail", false);
-
             // Maid ears: only on a maid helmet, and only where the armor texture paints them.
-            EmoteConfig cfg = EmoteConfig.get();
             boolean maid = cfg.maidArmor && MaidUtil.isMaidName(state.headEquipment.get(DataComponents.CUSTOM_NAME));
             emotes$show(head, "maid_ear_r", maid);
             emotes$show(head, "maid_ear_l", maid);
+        }
 
-            // Hinata outfit: thinner sleeves (armor models only, never the player's own arms).
-            // Other models are left alone: baby mobs keep their own small arm size.
-            Component name = state.chestEquipment.get(DataComponents.CUSTOM_NAME);
-            boolean hinata = cfg.hinataArmor && name != null && "Hinata".equals(name.getString());
-            if (hinata) {
-                if (!emotes$slimmed) {
-                    emotes$rx = rightArm.xScale; emotes$rz = rightArm.zScale;
-                    emotes$lx = leftArm.xScale;  emotes$lz = leftArm.zScale;
-                    emotes$slimmed = true;
-                }
-                rightArm.xScale = emotes$rx * SLIM; rightArm.zScale = emotes$rz * SLIM;
-                leftArm.xScale = emotes$lx * SLIM;  leftArm.zScale = emotes$lz * SLIM;
-            } else if (emotes$slimmed) {
-                rightArm.xScale = emotes$rx; rightArm.zScale = emotes$rz;
-                leftArm.xScale = emotes$lx;  leftArm.zScale = emotes$lz;
-                emotes$slimmed = false;
+        // Hinata outfit: thinner sleeves on the armor models only. Other models are left alone, so baby mobs
+        // keep their own small arm size and your own arms stay normal.
+        Component name = state.chestEquipment.get(DataComponents.CUSTOM_NAME);
+        boolean hinata = !body && cfg.hinataArmor && name != null && "Hinata".equals(name.getString());
+        if (hinata) {
+            if (!emotes$slimmed) {
+                emotes$rx = rightArm.xScale; emotes$rz = rightArm.zScale;
+                emotes$lx = leftArm.xScale;  emotes$lz = leftArm.zScale;
+                emotes$slimmed = true;
             }
+            rightArm.xScale = emotes$rx * SLIM; rightArm.zScale = emotes$rz * SLIM;
+            leftArm.xScale = emotes$lx * SLIM;  leftArm.zScale = emotes$lz * SLIM;
+        } else if (emotes$slimmed) {
+            rightArm.xScale = emotes$rx; rightArm.zScale = emotes$rz;
+            leftArm.xScale = emotes$lx;  leftArm.zScale = emotes$lz;
+            emotes$slimmed = false;
         }
 
         emotes$applyEmote(state, holder);

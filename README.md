@@ -1,6 +1,6 @@
 # Iris's Overrides, Tweaks, Emote wheel and armor (Fabric, Minecraft 1.21.11)
 
-Version 2.3.0. One jar, one mod entry, everything inside:
+Version 2.4.0. One jar, one mod entry, everything inside:
 
 - **Iris's Overrides & Tweaks** (this project's own code): skin overrides, movable HUD, map, chat, freecam, chest sorter and more (below).
 - **Emote Wheel + Hinata / maid armor** (nested inside the same jar as `emote_wheel`, see `emote-wheel/README.md`): 310+ emotes on a radial wheel, cat ears / tail / pet, particles, jutsu props and the armor outfits.
@@ -11,6 +11,10 @@ Drop the single jar into `mods` with Fabric API. To let other players see your e
 The two parts are written against different Minecraft name sets (this part uses Yarn names, the Emote Wheel uses Mojang names), so they live in two Gradle modules (`/` and `/emote-wheel`) and the build nests the Emote Wheel jar inside the main jar. Settings -> Tools has buttons that open the Emote Wheel menu and settings. The emote screens (menu, wheel, settings, clone panel) use the same Iris theme as everything else and follow Settings -> Theme live.
 
 Key conflict note: the Emote Wheel uses **B** (wheel) and **N** (menu), so "add waypoint" is **V**.
+
+## New in 2.4.0
+- **Settings search:** a search box at the top of the settings screen searches every setting in every tab (by tab, section, name and description) and lets you change them right in the results. Clicking a tab goes back to normal.
+- **Reroller stalls fixed:** a novice librarian only has two trades, so a reroll often gives the same list as before. The reroller took that as "the click did nothing" and waited about three seconds. It now notices every answer from the server (even an identical one), clicks a moment after each answer, and only treats a click as lost after waiting about three times as long as the last answers took.
 
 ## New in 2.3.0
 - **Villager reroller:** it now clicks the Trade Cycling mod's own button (the arrow at the top left of the trade screen) and stays in the trade screen. **Escape stops it immediately, from anywhere**, and it also stops by itself if a step gets stuck. The setup screen is now a **wishlist**: add as many enchantments as you like, set a lowest level and a highest price for each, and it keeps going until the first trade that fits any of them. Every enchantment shows its highest level and the cheapest price it can ever have (treasure enchantments cost double).
