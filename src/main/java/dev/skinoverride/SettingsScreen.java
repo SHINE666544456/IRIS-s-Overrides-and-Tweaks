@@ -8,11 +8,14 @@ import dev.skinoverride.map.MapData;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.util.Formatting;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -112,9 +115,79 @@ public class SettingsScreen extends ThemedScreen {
         Ui.applyTheme(cfg);
     }
 
+    // ---------- search ----------
+
+    private String query = "";
+    private TextFieldWidget searchField;
+    private String cachedQuery;
+    private List<Row> cachedRows;
+
+    /** The rows on screen: the current tab, or every setting that matches the search box. */
     private List<Row> rows() {
+        String q = query.trim().toLowerCase(Locale.ROOT);
+        if (q.isEmpty()) {
+            return tabRows(tab);
+        }
+        if (!q.equals(cachedQuery) || cachedRows == null) {
+            cachedQuery = q;
+            cachedRows = searchRows(q);
+        }
+        return cachedRows;
+    }
+
+    private static String rowText(Row row) {
+        return switch (row) {
+            case Toggle t -> t.label() + " " + t.desc();
+            case Slider s -> s.label() + " " + s.desc();
+            case Cycle cy -> cy.label() + " " + cy.desc();
+            case ColorRow cr -> cr.label() + " " + cr.desc();
+            case Action a -> a.label() + " " + a.desc();
+            default -> null;
+        };
+    }
+
+    /** Every setting from every tab whose tab, section, name or description has all the typed words. */
+    private List<Row> searchRows(String q) {
+        String[] words = q.split("\\s+");
+        List<Row> out = new ArrayList<>();
+        for (int i = 0; i < TABS.length; i++) {
+            List<Row> matches = new ArrayList<>();
+            String section = "";
+            for (Row row : tabRows(i)) {
+                if (row instanceof Header h) {
+                    section = h.text();
+                    continue;
+                }
+                String text = rowText(row);
+                if (text == null) {
+                    continue; // notes and grids are not searched
+                }
+                String hay = (TABS[i] + " " + section + " " + text).toLowerCase(Locale.ROOT);
+                boolean all = true;
+                for (String w : words) {
+                    if (!hay.contains(w)) {
+                        all = false;
+                        break;
+                    }
+                }
+                if (all) {
+                    matches.add(row);
+                }
+            }
+            if (!matches.isEmpty()) {
+                out.add(new Header(TABS[i]));
+                out.addAll(matches);
+            }
+        }
+        if (out.isEmpty()) {
+            out.add(new Note("No setting matches \"" + query.trim() + "\"."));
+        }
+        return out;
+    }
+
+    private List<Row> tabRows(int tabIndex) {
         List<Row> r = new ArrayList<>();
-        switch (TAB_CASE[tab]) {
+        switch (TAB_CASE[tabIndex]) {
             case 0 -> {
                 r.add(new Header("Armor & held items"));
                 r.add(new Toggle("Show armor HUD", "Your armor and held items. Drag it anywhere.",
@@ -666,8 +739,19 @@ public class SettingsScreen extends ThemedScreen {
         py = 24;
         contentX = px + TAB_W + 8;
         contentW = pw - TAB_W - 14;
-        contentTop = py + 22;
+        contentTop = py + 42;
         contentBottom = py + ph - 4;
+
+        this.searchField = new TextFieldWidget(this.textRenderer, contentX, py + 22, contentW, 16, Text.literal("Search settings"));
+        this.searchField.setPlaceholder(Text.literal("Search all settings...").formatted(Formatting.DARK_GRAY));
+        this.searchField.setMaxLength(40);
+        this.searchField.setText(query);
+        this.searchField.setChangedListener(text -> {
+            query = text;
+            scroll = 0;
+            cachedQuery = null;
+        });
+        this.addDrawableChild(this.searchField);
 
         int y = this.height - 28;
         int bw = Math.min(120, (pw - 8) / 3);
@@ -681,14 +765,13 @@ public class SettingsScreen extends ThemedScreen {
 
     @Override
     public void render(DrawContext c, int mouseX, int mouseY, float delta) {
-        super.render(c, mouseX, mouseY, delta);
-
         Ui.panel(c, px, py, pw, ph);
         Ui.header(c, this.textRenderer, "IRIS'S Overrides and Tweaks  /  Settings", px + 1, py + 1, pw - 2);
+        super.render(c, mouseX, mouseY, delta); // the search box, on top of the panel
 
         for (int i = 0; i < TABS.length; i++) {
             int ty = py + 22 + i * TAB_STEP;
-            boolean sel = i == tab;
+            boolean sel = i == tab && query.trim().isEmpty();
             boolean hov = Ui.inside(mouseX, mouseY, px + 4, ty, TAB_W, 15);
             Ui.roundRect(c, px + 4, ty, TAB_W, 15, sel ? Ui.ACCENT_FILL : hov ? Ui.BG_HOVER : Ui.BG_LIGHT);
             Ui.roundBorder(c, px + 4, ty, TAB_W, 15, sel ? Ui.ACCENT : Ui.BORDER);
@@ -824,6 +907,9 @@ public class SettingsScreen extends ThemedScreen {
 
         for (int i = 0; i < TABS.length; i++) {
             if (Ui.inside(mx, my, px + 4, py + 22 + i * TAB_STEP, TAB_W, 15)) {
+                if (!query.isEmpty()) {
+                    this.searchField.setText(""); // leaving the search: show the tab
+                }
                 if (tab != i) {
                     tab = i;
                     scroll = 0;

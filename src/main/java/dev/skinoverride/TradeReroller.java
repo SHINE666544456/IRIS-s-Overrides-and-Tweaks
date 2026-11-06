@@ -76,6 +76,13 @@ public final class TradeReroller {
     /** in automatic mode: fall back to breaking the job block if cycling does nothing */
     private static boolean canFallBack;
     private static int cycleFails;
+    /** The trade list we last looked at. A fresh answer from the server is a new list object even when it holds
+     *  exactly the same trades (which happens a lot for a novice librarian with only two trades). */
+    private static Object lastOffersRef;
+    private static boolean needPress;
+    private static int pressDelay;
+    /** how many ticks the last answer took, to know how long to wait before assuming a click was lost */
+    private static int latency = 4;
 
     private TradeReroller() {
     }
@@ -220,6 +227,9 @@ public final class TradeReroller {
         useCycling = cycling;
         canFallBack = cycling && method == 0 && breakPossible;
         cycleFails = 0;
+        needPress = false;
+        lastOffersRef = null;
+        latency = 4;
 
         villager = v;
         lastVillager = v;
@@ -453,18 +463,23 @@ public final class TradeReroller {
         String now = sig.toString();
         if (useCycling) {
             lastSig = now;
+            lastOffersRef = offers;
             status = "Try " + rolls + ": no match yet (cycling)";
             mc.inGameHud.setOverlayMessage(Text.literal("Reroll try " + rolls + " of " + cfg.rerollMaxTries
                     + " (wishlist)"), false);
-            pressCycleKey(mc, screen, cfg);
+            // click a moment later, not in the very tick the answer arrived (the button may not be ready yet)
+            needPress = true;
+            pressDelay = 0;
             state = State.WAIT_CYCLE;
             timer = 0;
             return;
         }
         if (now.equals(lastSig)) {
             sameCount++;
-            breakWait = Math.min(breakWait + 15, 140); // maybe the villager needs longer to lose its job
-            if (sameCount >= 6) {
+            if (sameCount >= 3) {
+                breakWait = Math.min(breakWait + 15, 140); // maybe the villager needs longer to lose its job
+            }
+            if (sameCount >= 10) {
                 stop(mc, "Reroll stopped: the trades never change. This villager is probably locked (already traded with)");
                 return;
             }
@@ -500,17 +515,25 @@ public final class TradeReroller {
      */
     private static void pressCycleKey(MinecraftClient mc, MerchantScreen screen, ModConfig cfg) {
         int enterScan = org.lwjgl.glfw.GLFW.glfwGetKeyScancode(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER);
-        for (var child : screen.children()) {
-            if (!(child instanceof ClickableWidget widget) || !widget.visible || !widget.active) {
-                continue;
-            }
-            String name = widget.getClass().getName();
-            if (name.startsWith("net.minecraft.") || name.startsWith("dev.skinoverride.") || name.startsWith("net.fabricmc.")) {
-                continue;
-            }
-            // a button "presses" itself when it gets Enter, no mouse position needed
-            if (widget.keyPressed(new net.minecraft.client.input.KeyInput(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, enterScan, 0))) {
-                return;
+        net.minecraft.client.input.KeyInput enter = new net.minecraft.client.input.KeyInput(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, enterScan, 0);
+        // first the widget that looks like the cycle button, then any other widget from another mod
+        for (int pass = 0; pass < 2; pass++) {
+            for (var child : screen.children()) {
+                if (!(child instanceof ClickableWidget widget) || !widget.visible || !widget.active) {
+                    continue;
+                }
+                String name = widget.getClass().getName();
+                if (name.startsWith("net.minecraft.") || name.startsWith("dev.skinoverride.") || name.startsWith("net.fabricmc.")) {
+                    continue;
+                }
+                boolean looksRight = name.toLowerCase(Locale.ROOT).contains("cycl");
+                if ((pass == 0) != looksRight) {
+                    continue;
+                }
+                // a button "presses" itself when it gets Enter, no mouse position needed
+                if (widget.keyPressed(enter)) {
+                    return;
+                }
             }
         }
         int key = cfg.rerollCycleKey;
@@ -544,19 +567,33 @@ public final class TradeReroller {
             state = State.INTERACT;
             return;
         }
-        String sig = signature(screen.getScreenHandler().getRecipes());
-        if (!sig.isEmpty() && !sig.equals(lastSig)) {
-            // The new trades arrived. Look at them right now, in this same tick, so no further click can happen
-            // before we know whether they are the ones you wanted.
+        if (needPress) {
+            if (++pressDelay >= 2) {
+                needPress = false;
+                timer = 0;
+                pressCycleKey(mc, screen, ModConfig.get());
+            }
+            return;
+        }
+        TradeOfferList offers = screen.getScreenHandler().getRecipes();
+        String sig = signature(offers);
+        // A new answer is a different list object, or a list with different trades. Comparing only the trades
+        // missed answers that happened to be identical to the last list, and the reroller then sat waiting.
+        boolean changed = !sig.isEmpty() && (offers != lastOffersRef || !sig.equals(lastSig));
+        if (changed) {
+            latency = Math.max(2, Math.min(30, (latency + timer) / 2));
             cycleFails = 0;
             state = State.CHECK;
             timer = 0;
+            // Look at the new trades right now, in this same tick, so no further click can happen before we
+            // know whether they are the ones you wanted.
             check(mc, ModConfig.get());
             return;
         }
-        // Never click again just because the answer is slow (a laggy connection would then replace a good
-        // trade with another one). Only after a long silence is the click treated as lost.
-        if (++timer >= 60) {
+        // Do not click again just because the answer is slow (that could replace a good trade). Wait about three
+        // times as long as the last answers took, and only then treat the click as lost.
+        int patience = Math.max(16, Math.min(70, latency * 3 + 8));
+        if (++timer >= patience) {
             timer = 0;
             cycleFails++;
             if (cycleFails >= 3) {
